@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5efe6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="styleit">
+  <title>styleit</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <h1 class="logo">style<em>it</em></h1>
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-view="feed" role="tab">For you</button>
+        <button class="tab" data-view="saved" role="tab">Saved <span class="count" id="savedCount"></span></button>
+      </nav>
+      <button class="icon-btn" id="filterBtn" aria-label="Filters">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        <span class="badge" id="filterBadge" hidden></span>
+      </button>
+    </div>
+    <div class="active-bar" id="activeBar" hidden></div>
+  </header>
+
+  <main>
+    <section id="feedView">
+      <div class="grid" id="feedGrid"></div>
+      <div class="sentinel" id="sentinel"></div>
+      <div class="empty" id="feedEmpty" hidden>
+        <p>Nothing matches those filters.</p>
+        <button class="btn" id="clearFilters">Clear filters</button>
+      </div>
+    </section>
+
+    <section id="savedView" hidden>
+      <div class="refs" id="refs"></div>
+      <div class="grid" id="savedGrid"></div>
+      <div class="empty" id="savedEmpty" hidden>
+        <p>Tap the heart on anything you like.<br>Your feed learns from every heart and every ✕.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="status" id="status">Loading…</footer>
+
+  <div class="sheet-backdrop" id="sheetBackdrop" hidden></div>
+  <aside class="sheet" id="sheet" aria-hidden="true">
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+      <h2>Filters</h2>
+      <div class="group"><h3>Vibe</h3><div class="chips" id="fVibes"></div></div>
+      <div class="group"><h3>Category</h3><div class="chips" id="fCats"></div></div>
+      <div class="group"><h3>Size in stock</h3><div class="chips" id="fSizes"></div></div>
+      <div class="group">
+        <h3>Max price <span id="fPriceLabel" class="muted"></span></h3>
+        <input type="range" id="fPrice" min="30" max="500" step="10">
+      </div>
+      <div class="group toggles">
+        <label class="toggle"><input type="checkbox" id="fSale"> <span>On sale</span></label>
+        <label class="toggle"><input type="checkbox" id="fNew"> <span>New this week</span></label>
+      </div>
+      <div class="group"><h3>Stores</h3><div class="chips" id="fStores"></div></div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn ghost" id="resetFilters">Reset</button>
+      <button class="btn" id="applyFilters">Show results</button>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

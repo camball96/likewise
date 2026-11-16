@@ -1,0 +1,11 @@
+{
+  "_note": "Style references: pieces she loves. The feed ranks everything by visual similarity to these (plus her hearts). Add Shopify product URLs to 'products', or direct image URLs / files in config/seed-images/ to 'images' (e.g. Pinterest saves or screenshots). More references = better matching.",
+  "products": [
+    "https://bronzesnake.com/products/sai-mini-skort-chocolate",
+    "https://bronzesnake.com/products/daisy-mini-dress-mocha",
+    "https://bronzesnake.com/products/suzie-top-bianco",
+    "https://bronzesnake.com/products/aria-mini-dress-brown",
+    "https://www.vrggrl.com/collections/clothing/products/tessa-top-burgundy"
+  ],
+  "images": []
+}

@@ -1,0 +1,68 @@
+name: Build catalogue & deploy
+
+on:
+  schedule:
+    - cron: "17 17 * * *"   # daily, ~3:17am Brisbane
+  workflow_dispatch:         # "Run workflow" button in the Actions tab
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -r pipeline/requirements.txt
+
+      # image embeddings are cached between runs so only new products get processed
+      - name: Restore embedding cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .cache
+          key: embeddings-${{ github.run_id }}
+          restore-keys: embeddings-
+
+      - name: Build catalogue
+        run: python pipeline/build.py
+
+      - name: Save embedding cache
+        if: always() && hashFiles('.cache/embeddings.npz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .cache
+          key: embeddings-${{ github.run_id }}
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

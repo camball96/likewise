@@ -1,0 +1,184 @@
+"""Fetch and normalise products from public Shopify storefronts (/products.json)."""
+from __future__ import annotations
+
+import json
+import re
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime, timezone
+
+UA = "Mozilla/5.0 (compatible; styleit/1.0; personal outfit finder)"
+PAGE_SIZE = 250
+REQUEST_GAP_S = 1.0  # be polite: at most ~1 request/second per store
+
+
+def get_json(url: str, retries: int = 3) -> dict:
+    last = None
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code in (429, 500, 502, 503, 504):
+                time.sleep(5 * (attempt + 1))
+                continue
+            raise
+        except Exception as e:  # network blips
+            last = e
+            time.sleep(3 * (attempt + 1))
+    raise last  # type: ignore[misc]
+
+
+def fetch_store(domain: str, max_products: int) -> list[dict]:
+    """Newest-first products (Shopify returns products.json ordered by publish date)."""
+    out: list[dict] = []
+    page = 1
+    while len(out) < max_products:
+        data = get_json(f"https://{domain}/products.json?limit={PAGE_SIZE}&page={page}")
+        batch = data.get("products", [])
+        if not batch:
+            break
+        out.extend(batch)
+        if len(batch) < PAGE_SIZE:
+            break
+        page += 1
+        time.sleep(REQUEST_GAP_S)
+    return out[:max_products]
+
+
+def fetch_product_by_url(url: str) -> dict | None:
+    """Resolve a product page URL (any /collections/... prefix) to its Shopify product JSON."""
+    u = urllib.parse.urlparse(url)
+    m = re.search(r"/products/([^/?#]+)", u.path)
+    if not m:
+        return None
+    return get_json(f"https://{u.netloc}/products/{m.group(1)}.json").get("product")
+
+
+# ---------------------------------------------------------------- classification
+
+EXCLUDE = re.compile(
+    r"\b(accessor(?:y|ies)|axx|intimates?|gift ?cards?|e-?gift|bags?|tote|clutch|purse|wallet|belts?|earrings?|earings?|necklaces?|bracelets?|rings?|"
+    r"jewel(?:le)?ry|anklet|hair|scrunchie|claw clip|headband|hats?|caps?|beanie|scarf|sunglasses|socks?|"
+    r"shoes?|heels?|boots?|sandals?|flats|sneakers?|slides|mules|loafers|thongs|footwear|"
+    r"beauty|fragrance|perfume|candle|homewares?|towel|mug|book|sticker|keyring|phone case|"
+    r"bras?|briefs?|undies|underwear|knickers|thong brief|g-string|lingerie|sleepwear|pyjamas?|pajamas?|robe|"
+    r"activewear|leggings|sports bra|bike shorts|maternity|kids?|girls|baby|"
+    r"shipping protection|route|insurance|sample|gift wrap|gift box|warranty|donation)\b",
+    re.I,
+)
+MENS = re.compile(r"(^|[^a-z])(mens|men's|men|male|him)([^a-z]|$)", re.I)
+
+CATEGORY_RULES: list[tuple[str, re.Pattern]] = [
+    ("Dresses",     re.compile(r"\b(dress(es)?|gown|slip dress|maxi dress|midi dress|mini dress)\b", re.I)),
+    ("Jumpsuits",   re.compile(r"\b(jumpsuit|playsuit|romper|unitard)s?\b", re.I)),
+    ("Sets",        re.compile(r"\b(set|co-?ord|two piece|2 piece|matching)s?\b", re.I)),
+    ("Skirts",      re.compile(r"\b(skirt|skort)s?\b", re.I)),
+    ("Shorts",      re.compile(r"\bshorts\b", re.I)),
+    ("Pants",       re.compile(r"\b(pants?|jeans?|trousers?|denim|flares?|culottes?|cargos?|joggers?|trackpants?)\b", re.I)),
+    ("Swim",        re.compile(r"\b(swim\w*|bikini|one piece|sarong|kaftan|cover up)s?\b", re.I)),
+    ("Outerwear",   re.compile(r"\b(jacket|coat|blazer|trench|bomber|puffer|gilet|vest|outerwear|shacket)s?\b", re.I)),
+    ("Knitwear",    re.compile(r"\b(knit\w*|cardigan|cardi|jumper|sweater|pullover|hoodie|sweat\w*)s?\b", re.I)),
+    ("Tops",        re.compile(r"\b(tops?|tee|t-shirt|tshirt|shirt|blouse|cami|camisole|bodysuit|corset|bustier|tank|singlet|crop|tube|halter|polo|bodice|vest top|long ?sleeve)s?\b", re.I)),
+]
+CATEGORIES = [c for c, _ in CATEGORY_RULES]
+
+
+def classify(title: str, product_type: str, tags: list[str]) -> str | None:
+    """Return a category from title first (most reliable), then product_type. None = unknown."""
+    for text in (title, product_type):
+        if not text:
+            continue
+        for cat, rx in CATEGORY_RULES:
+            if rx.search(text):
+                return cat
+    return None
+
+
+def is_excluded(title: str, product_type: str, tags: list[str]) -> bool:
+    if EXCLUDE.search(product_type or "") or EXCLUDE.search(title or ""):
+        # but don't drop e.g. "Bow Tie Dress" style titles that are clearly clothing
+        if not (classify(title, "", []) and not EXCLUDE.search(product_type or "")):
+            return True
+    if MENS.search(product_type or ""):
+        return True
+    tag_text = " ".join(tags)
+    if re.search(r"\b(mens|men's)\b", tag_text, re.I) and not re.search(r"\bwomens?\b|women's", tag_text, re.I):
+        return True
+    return False
+
+
+SIZE_TOKEN = re.compile(r"\b(XXS|XS|S|M|L|XL|XXL|2XL|3XL|OS|ONE SIZE|\d{1,2})\b", re.I)
+
+
+def size_tokens(value: str) -> list[str]:
+    v = value.upper().replace("AU ", "").replace("AU", "")
+    toks = [t.upper() for t in SIZE_TOKEN.findall(v)]
+    return ["OS" if t == "ONE SIZE" else t for t in toks]
+
+
+def normalise(store: dict, p: dict, currency: str) -> dict | None:
+    title = (p.get("title") or "").strip()
+    ptype = (p.get("product_type") or "").strip()
+    tags = p.get("tags") or []
+    if isinstance(tags, str):
+        tags = [t.strip() for t in tags.split(",")]
+    if is_excluded(title, ptype, tags):
+        return None
+    variants = p.get("variants") or []
+    avail = [v for v in variants if v.get("available")]
+    if not avail or not p.get("images"):
+        return None
+
+    # sizes in stock
+    size_pos = None
+    for o in p.get("options") or []:
+        if "size" in (o.get("name") or "").lower():
+            size_pos = o.get("position")
+    sizes: list[str] = []
+    if size_pos:
+        for v in avail:
+            for t in size_tokens(str(v.get(f"option{size_pos}") or "")):
+                if t not in sizes:
+                    sizes.append(t)
+    elif len(variants) == 1:
+        sizes = ["OS"]
+
+    prices = [float(v["price"]) for v in avail if v.get("price")]
+    price = min(prices) if prices else 0.0
+    compares = [float(v["compare_at_price"]) for v in avail if v.get("compare_at_price")]
+    compare = max(compares) if compares else 0.0
+    if compare <= price + 0.5:
+        compare = 0.0
+
+    img = p["images"][0]["src"]
+    published = p.get("published_at") or p.get("created_at")
+    try:
+        pub_ts = int(datetime.fromisoformat(published.replace("Z", "+00:00")).timestamp())
+    except Exception:
+        pub_ts = int(datetime.now(timezone.utc).timestamp())
+
+    return {
+        "id": f"{store['key']}:{p['id']}",
+        "store": store["key"],
+        "title": title,
+        "url": f"https://{store['domain']}/products/{p['handle']}",
+        "img": img,
+        "price": round(price, 2),
+        "compare": round(compare, 2),
+        "currency": currency,
+        "cat": classify(title, ptype, tags),
+        "sizes": sizes,
+        "published": pub_ts,
+    }
+
+
+def store_currency(domain: str) -> str:
+    try:
+        return get_json(f"https://{domain}/meta.json").get("currency") or "AUD"
+    except Exception:
+        return "AUD"
