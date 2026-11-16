@@ -22,7 +22,7 @@ Built as a static site on GitHub Pages: a scheduled GitHub Action does the heavy
 
 ## Deploy (one-time setup)
 
-1. Create a GitHub repo (e.g. `styleit`) and push this folder to `main`:
+1. Create a GitHub repo (e.g. `styleit`) and push this folder (the workflow builds on pushes to `production` or `main`):
    ```bash
    cd ~/Documents/Code/styleit
    git init -b main && git add . && git commit -m "styleit v1"
