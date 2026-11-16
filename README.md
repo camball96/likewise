@@ -30,7 +30,7 @@ Built as a static site on GitHub Pages: a scheduled GitHub Action does the heavy
    git push -u origin main
    ```
 2. In the repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. **Actions** tab → *Build catalogue & deploy* → **Run workflow** (the push also triggers it).
+3. **Actions** tab → _Build catalogue & deploy_ → **Run workflow** (the push also triggers it).
    The first run embeds up to 8,000 product photos (~20–30 min); later runs only process new products (a few minutes).
 4. The site is live at `https://<you>.github.io/styleit/`. On her phone: Share → **Add to Home Screen** for an app-like icon.
 
@@ -38,13 +38,13 @@ It rebuilds daily at ~3am Brisbane time. Note: GitHub pauses scheduled workflows
 
 ## Tuning it
 
-| Want to… | Edit |
-|---|---|
-| Add style references | `config/seeds.json` → add product URLs to `products`, or drop photos/screenshots into `config/seed-images/` |
-| Add a store | `config/stores.json` (any Shopify store — check `https://<domain>/products.json` loads) |
-| Pause a store | add `"enabled": false` to its entry |
-| Add a "vibe" filter chip | `config/vibes.json` — a name plus a plain-English description |
-| Pull more/fewer products per store | `defaults.max_products` in `config/stores.json` |
+| Want to…                           | Edit                                                                                                        |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Add style references               | `config/seeds.json` → add product URLs to `products`, or drop photos/screenshots into `config/seed-images/` |
+| Add a store                        | `config/stores.json` (any Shopify store — check `https://<domain>/products.json` loads)                     |
+| Pause a store                      | add `"enabled": false` to its entry                                                                         |
+| Add a "vibe" filter chip           | `config/vibes.json` — a name plus a plain-English description                                               |
+| Pull more/fewer products per store | `defaults.max_products` in `config/stores.json`                                                             |
 
 Every store in the list was checked as Australian-based (Shopify `meta.json` reports country AU, currency AUD).
 
@@ -64,7 +64,7 @@ Useful flags: `--stores bronzesnake,vrggrl` (subset), `--max-new 500` (cap new e
 ## How the ranking works
 
 - Each photo becomes a 256-number "style fingerprint" from a fashion-specific image model ([Marqo FashionSigLIP](https://huggingface.co/Marqo/marqo-fashionSigLIP)), projected through a fixed basis (`pipeline/basis.npz` — keep it committed so saved hearts stay comparable across builds).
-- A product's score blends similarity to the *average* of her taste with similarity to her *closest few* individual favourites (so several distinct looks can coexist), and is pushed down if it closely resembles things she ✕'d.
+- A product's score blends similarity to the _average_ of her taste with similarity to her _closest few_ individual favourites (so several distinct looks can coexist), and is pushed down if it closely resembles things she ✕'d.
 - Hearts count double compared with reference photos. Hearted items keep their fingerprint even after they sell out.
 - The feed hides near-identical pieces (same style, other colour), avoids long runs from one store, and slips in an occasional wildcard so it doesn't collapse onto one look.
 - **Similar** re-ranks everything around one piece; **vibes** steer by a text description.
@@ -81,3 +81,5 @@ site/          index.html, app.js, style.css  (+ data/ generated at build time)
 ```
 
 Be a polite guest: the fetcher reads only public product listings, about one request per second per store, once a day.
+
+<!--  -->
