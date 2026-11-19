@@ -21,12 +21,20 @@ export default function OutfitPage() {
   const outfits = useQuery(trpc.outfits.list.queryOptions());
   const outfit = outfits.data?.find((o) => o.id === id);
   const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
+  // poll while pasted links are being analysed; the feed restarts when one becomes ready
+  const saved = useQuery({
+    ...trpc.items.saved.queryOptions({ outfitId: id }),
+    enabled: !!outfit,
+    refetchInterval: (q) => (q.state.data?.references.some((r) => r.status === "PENDING") ? 5000 : false),
+  });
+  const references = saved.data?.references ?? [];
+  const ready = references.filter((r) => r.status === "READY").length;
 
   return (
     <div className="mx-auto max-w-6xl px-3 pb-16 sm:px-5">
       <header className="sticky top-0 z-10 -mx-3 flex items-center gap-3 border-b border-foreground/5 bg-background/85 px-3 py-3 backdrop-blur sm:-mx-5 sm:px-5">
         <Link href="/" className="font-heading text-3xl font-semibold">
-          style<em className="text-[#6e4a35]">it</em>
+          like<em className="text-[#6e4a35]">wise</em>
         </Link>
         <nav className="flex flex-1 gap-1 overflow-x-auto">
           {outfits.data?.map((o) => (
@@ -63,7 +71,7 @@ export default function OutfitPage() {
             </TabsList>
           </div>
           <TabsContent value="feed" className="mt-6">
-            <Feed key={outfit.id} outfitId={outfit.id} />
+            <Feed key={`${outfit.id}-${ready}`} outfitId={outfit.id} analysing={references.some((r) => r.status === "PENDING")} />
           </TabsContent>
           <TabsContent value="saved" className="mt-6">
             <Saved outfitId={outfit.id} />
@@ -100,7 +108,7 @@ function useSetItem(outfitId: string) {
 
 // Infinite feed: each page asks the server for the next best matches, excluding what's already shown.
 // Hearts and skips are saved immediately, so later pages reflect them.
-function Feed({ outfitId }: { outfitId: string }) {
+function Feed({ outfitId, analysing }: { outfitId: string; analysing: boolean }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const setItem = useSetItem(outfitId);
@@ -145,6 +153,11 @@ function Feed({ outfitId }: { outfitId: string }) {
 
   return (
     <>
+      {analysing && (
+        <p className="mb-4 rounded-xl bg-secondary/60 px-4 py-3 text-sm">
+          We&apos;re still analysing some of your inspiration links. The feed sharpens once they&apos;re done (usually a minute or two).
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
         {products.map((p) => (
           <ProductCard key={p.id} product={p} outfitId={outfitId} liked={liked.has(p.id)} onLike={() => like(p.id)} onSkip={() => skip(p.id)} />

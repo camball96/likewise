@@ -7,7 +7,7 @@ const sans = Inter({ variable: "--font-sans", subsets: ["latin"] });
 const serif = Cormorant_Garamond({ variable: "--font-serif", subsets: ["latin"], weight: ["500", "600"] });
 
 export const metadata: Metadata = {
-  title: "styleit",
+  title: "likewise",
   description: "Clothes you'll actually like, from Australian stores.",
 };
 

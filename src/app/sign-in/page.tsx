@@ -35,7 +35,7 @@ export default function SignInPage() {
       <div className="grid w-full max-w-5xl items-center gap-12 md:grid-cols-2">
         <section className="mx-auto max-w-md">
           <p className="font-heading text-3xl font-semibold">
-            style<em className="text-[#6e4a35]">it</em>
+            like<em className="text-[#6e4a35]">wise</em>
           </p>
           <p className="eyebrow mt-10">Australian fashion, matched to you</p>
           <h1 className="mt-3 font-heading text-5xl leading-[1.05] font-semibold sm:text-6xl">

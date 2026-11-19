@@ -1,15 +1,16 @@
 # Local Postgres with pgvector for development: `docker compose up -d`
+name: likewise
 services:
   db:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:pg18  # match Render (Postgres 18) so pg_dump works
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: styleit
+      POSTGRES_DB: likewise
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql  # Postgres 18 images keep data under /var/lib/postgresql
 
 volumes:
   pgdata:

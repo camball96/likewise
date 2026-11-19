@@ -49,6 +49,7 @@ model Outfit {
   userId     String
   user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   name       String
+  categories String[]     @default([]) // e.g. ["Tops"]; empty = all categories
   stores     Store[] // empty = all stores
   items      OutfitItem[]
   references Reference[]

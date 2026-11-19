@@ -29,14 +29,22 @@ export const appRouter = router({
     ),
 
     save: protectedProcedure
-      .input(z.object({ id: z.string().optional(), name: z.string().trim().min(1).max(40), storeIds: z.array(z.string()) }))
+      .input(
+        z.object({
+          id: z.string().optional(),
+          name: z.string().trim().min(1).max(40),
+          categories: z.array(z.string()),
+          storeIds: z.array(z.string()),
+        }),
+      )
       .mutation(async ({ ctx, input }) => {
         const stores = input.storeIds.map((id) => ({ id }));
+        const data = { name: input.name, categories: input.categories };
         if (!input.id) {
-          return ctx.db.outfit.create({ data: { userId: ctx.user.id, name: input.name, stores: { connect: stores } } });
+          return ctx.db.outfit.create({ data: { ...data, userId: ctx.user.id, stores: { connect: stores } } });
         }
         await ownOutfit(ctx, input.id);
-        return ctx.db.outfit.update({ where: { id: input.id }, data: { name: input.name, stores: { set: stores } } });
+        return ctx.db.outfit.update({ where: { id: input.id }, data: { ...data, stores: { set: stores } } });
       }),
 
     delete: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
@@ -115,6 +123,7 @@ export const appRouter = router({
         FROM "Product" p JOIN "Store" s ON s.id = p."storeId" CROSS JOIN taste
         WHERE p."inStock" AND s.active AND p.embedding IS NOT NULL
           AND (cardinality(${storeIds}::text[]) = 0 OR p."storeId" = ANY(${storeIds}::text[]))
+          AND (cardinality(${outfit.categories}::text[]) = 0 OR p.category = ANY(${outfit.categories}::text[]))
           AND NOT (p.id = ANY(${input.exclude}::text[]))
           AND NOT EXISTS (SELECT 1 FROM "OutfitItem" i WHERE i."outfitId" = ${outfit.id} AND i."productId" = p.id)
         ORDER BY (p.embedding <=> taste.v) NULLS LAST, p."publishedAt" DESC
@@ -150,13 +159,24 @@ async function findCatalogueProduct(ctx: Ctx, url: string) {
   return ctx.db.product.findFirst({ where: { storeId: store.id, url: `https://${store.domain}/products/${handle}` } });
 }
 
-// The main photo of a page: its og:image / twitter:image tag, or the URL itself if it's an image.
+// The main photo of a page. Shopify product pages (most fashion stores) are read from their
+// /products/<handle>.json; anything else from its og:image / twitter:image tag, or the URL itself if it's an image.
 async function findImage(url: string): Promise<string | null> {
-  const { protocol, hostname } = new URL(url);
+  const { protocol, hostname, origin, pathname } = new URL(url);
   if (!protocol.startsWith("http") || hostname === "localhost" || /^[\d.:[\]]+$/.test(hostname)) return null;
+  const handle = pathname.match(/\/products\/([^/?#]+)/)?.[1];
+  if (handle) {
+    try {
+      const res = await fetch(`${origin}/products/${handle}.json`, { signal: AbortSignal.timeout(10_000) });
+      const src = res.ok ? (await res.json())?.product?.images?.[0]?.src : null;
+      if (typeof src === "string") return src;
+    } catch {
+      // not a Shopify store; fall back to the page's tags
+    }
+  }
   try {
     const res = await fetch(url, {
-      headers: { "user-agent": "Mozilla/5.0 (compatible; styleit/1.0)", accept: "text/html,image/*" },
+      headers: { "user-agent": "Mozilla/5.0 (compatible; likewise/1.0)", accept: "text/html,image/*" },
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) return null;
@@ -165,7 +185,9 @@ async function findImage(url: string): Promise<string | null> {
     for (const tag of html.match(/<meta[^>]+>/gi) ?? []) {
       if (!/(property|name)=["'](og:image|og:image:url|og:image:secure_url|twitter:image)["']/i.test(tag)) continue;
       const content = tag.match(/content=["']([^"']+)["']/i)?.[1];
-      if (content) return new URL(content.replaceAll("&amp;", "&"), res.url).toString().replace(/^http:/, "https:");
+      if (!content) continue;
+      const image = new URL(content.replaceAll("&amp;", "&"), res.url);
+      if (image.hostname.includes(".")) return image.toString().replace(/^http:/, "https:"); // skip broken tags like "https:files/x.png"
     }
   } catch {
     // unreachable page, timeout, bad markup

@@ -1,4 +1,4 @@
-# styleit
+# likewise
 
 Sign in, create outfits ("Formal dresses", "PJs"), add a few pieces you love, and scroll a feed of clothes from curated Australian stores ranked by how alike they look. Tapping a product opens it on the brand's site.
 
@@ -24,7 +24,7 @@ The feed is one SQL query in `src/server/router.ts`: it averages the fingerprint
 
 ## Run locally
 
-1. Start the local database (Postgres 17 with pgvector, in Docker):
+1. Start the local database (Postgres 18 with pgvector, in Docker):
    ```bash
    docker compose up -d
    ```
@@ -38,9 +38,9 @@ The feed is one SQL query in `src/server/router.ts`: it averages the fingerprint
 3. Copy the stores and products from the Render database (after its first ingest run), so you don't need Python locally (the commands run inside the container, so no Postgres tools are needed on your Mac). Set `PROD_DATABASE_URL` in `.env` to Render's **External** URL, then:
    ```bash
    set -a; source .env; set +a
-   docker compose exec -T db psql -U postgres styleit -c 'TRUNCATE "Store" CASCADE'
+   docker compose exec -T db psql -U postgres likewise -c 'TRUNCATE "Store" CASCADE'
    docker compose exec -T db pg_dump "$PROD_DATABASE_URL" --data-only --table='"Store"' --table='"Product"' \
-     | docker compose exec -T db psql -U postgres styleit
+     | docker compose exec -T db psql -U postgres likewise
    ```
    Re-run step 3 whenever you want fresh products. It also clears local outfits, which point at products.
 
@@ -52,6 +52,8 @@ The feed is one SQL query in `src/server/router.ts`: it averages the fingerprint
    set -a; source .env; set +a
    python pipeline/ingest.py --max-new 500   # drop the flag to fingerprint everything
    ```
+
+   **Pasted inspiration links locally:** these are fingerprinted by the pipeline, which normally runs in GitHub Actions against the Render database. Locally, run it yourself after pasting links (same Python setup as above): `python pipeline/ingest.py --references-only`.
 
 Schema changes: edit `prisma/schema.prisma`, then `npx prisma migrate dev --name what-changed` creates the migration and applies it locally. Commit it; Render applies it on the next deploy.
 
