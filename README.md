@@ -63,7 +63,7 @@ Schema changes: edit `prisma/schema.prisma`, then `npx prisma migrate dev --name
 2. **Web service** from this repo:
    - Build command: `npm ci && npm run db:migrate && npm run build`
    - Start command: `npm start`
-   - Environment variables: `DATABASE_URL` (the database's Internal URL), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (the service's public URL), `GITHUB_DISPATCH_TOKEN`, `GITHUB_REPO`, `GITHUB_BRANCH`, and optionally `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (see `.env.example`)
+   - Environment variables: `DATABASE_URL` (the database's Internal URL), `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` (the service's public URL), `GITHUB_DISPATCH_TOKEN`, and optionally `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (see `.env.example`)
 3. **GitHub:** add a repository secret `DATABASE_URL` = the database's **External** URL (Settings → Secrets and variables → Actions), then run *Ingest catalogue into Postgres* once from the Actions tab. The first run fingerprints up to 8,000 photos (about 20–30 minutes); daily runs after that only process new products.
 4. `GITHUB_DISPATCH_TOKEN`: a fine-grained personal access token limited to this repo with **Actions: Read and write**.
 

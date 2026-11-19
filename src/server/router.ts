@@ -197,11 +197,14 @@ async function findImage(url: string): Promise<string | null> {
 
 // Ask GitHub Actions to fingerprint pending references now (instead of waiting for the daily run).
 async function startEmbeddingRun() {
-  const { GITHUB_DISPATCH_TOKEN, GITHUB_REPO, GITHUB_BRANCH = "production" } = process.env;
-  if (!GITHUB_DISPATCH_TOKEN || !GITHUB_REPO) return;
-  await fetch(`https://api.github.com/repos/${GITHUB_REPO}/actions/workflows/ingest.yml/dispatches`, {
+  // on Render the repo and branch come from its built-in RENDER_GIT_* variables
+  const token = process.env.GITHUB_DISPATCH_TOKEN;
+  const repo = process.env.GITHUB_REPO ?? process.env.RENDER_GIT_REPO_SLUG;
+  const branch = process.env.GITHUB_BRANCH ?? process.env.RENDER_GIT_BRANCH ?? "production";
+  if (!token || !repo) return;
+  await fetch(`https://api.github.com/repos/${repo}/actions/workflows/ingest.yml/dispatches`, {
     method: "POST",
-    headers: { authorization: `Bearer ${GITHUB_DISPATCH_TOKEN}`, accept: "application/vnd.github+json" },
-    body: JSON.stringify({ ref: GITHUB_BRANCH, inputs: { references_only: "true" } }),
+    headers: { authorization: `Bearer ${token}`, accept: "application/vnd.github+json" },
+    body: JSON.stringify({ ref: branch, inputs: { references_only: "true" } }),
   }).catch(() => {});
 }
