@@ -68,3 +68,21 @@
     @apply font-sans;
   }
 }
+/* ---------- styleit motifs ---------- */
+
+/* soft warm glow at the top of every page */
+body {
+  background:
+    radial-gradient(48rem 28rem at 50% -8rem, color-mix(in oklab, var(--secondary) 75%, transparent), transparent 70%) no-repeat,
+    var(--background);
+}
+
+/* the raised cream card used for forms and callouts */
+@utility panel {
+  @apply rounded-3xl bg-card p-6 shadow-xl ring-1 shadow-[#6e4a35]/5 ring-border;
+}
+
+/* small spaced-out caps label above headings */
+@utility eyebrow {
+  @apply text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase;
+}

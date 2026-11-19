@@ -22,10 +22,25 @@ import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent))
 import shopify  # noqa: E402
-from build import ZS_LABELS  # noqa: E402
-from embed import EmbeddingCache, Embedder, embed_sources, image_key  # noqa: E402
+from embed import Embedder, embed_sources, image_key  # noqa: E402
 
 CONFIG = Path(__file__).resolve().parent.parent / "config" / "stores.json"
+
+# labels for products whose title doesn't say what they are (matched against the photo)
+ZS_LABELS = {
+    "Dresses": "a photo of a woman wearing a dress",
+    "Tops": "a photo of a woman wearing a top",
+    "Skirts": "a photo of a woman wearing a skirt",
+    "Shorts": "a photo of a woman wearing shorts",
+    "Pants": "a photo of a woman wearing pants or jeans",
+    "Sets": "a photo of a woman wearing a matching two piece set",
+    "Knitwear": "a photo of a woman wearing a knit jumper or cardigan",
+    "Outerwear": "a photo of a woman wearing a jacket or coat",
+    "Jumpsuits": "a photo of a woman wearing a jumpsuit",
+    "Swim": "a photo of a woman wearing swimwear",
+    "Sleepwear": "a photo of a woman wearing pyjamas or sleepwear",
+    None: "a product photo of shoes, a bag, jewellery, a hat or an accessory",
+}
 
 
 def vec(v: np.ndarray) -> str:
@@ -58,9 +73,8 @@ def ingest_products(conn, max_new: int):
 
     def fetch(store):
         try:
-            cur = shopify.store_currency(store["domain"])
             raw = shopify.fetch_store(store["domain"], store.get("max_products", cap))
-            return store, [x for x in (shopify.normalise(store, p, cur) for p in raw) if x], None
+            return store, [x for x in (shopify.normalise(store, p) for p in raw) if x], None
         except Exception as e:
             return store, [], e
 
@@ -82,7 +96,7 @@ def ingest_products(conn, max_new: int):
 
     todo = [it for it in items if needs(it)]
     print(f"  {len(items)} products, {len(todo)} need a fingerprint", flush=True)
-    vecs = embed_sources(get_embedder(), EmbeddingCache(Path("/nonexistent")), [it["img"] for it in todo], max_new=max_new)
+    vecs = embed_sources(get_embedder(), [it["img"] for it in todo], max_new=max_new)
 
     # label products whose title didn't say what they are; drop non-clothing
     unknown = [it for it in todo if not it["cat"] and image_key(it["img"]) in vecs]
@@ -136,7 +150,8 @@ def ingest_references(conn):
     if not pending:
         print("  no pending references", flush=True)
         return
-    vecs = embed_sources(get_embedder(), EmbeddingCache(Path("/nonexistent")), [url for _, url in pending])
+    vecs = embed_sources(get_embedder(), [url for _, url in pending])
+    ready = 0
     with conn.cursor() as cur:
         for ref_id, url in pending:
             v = vecs.get(image_key(url))
@@ -144,8 +159,9 @@ def ingest_references(conn):
                 cur.execute('UPDATE "Reference" SET status = \'FAILED\' WHERE id = %s', (ref_id,))
             else:
                 cur.execute('UPDATE "Reference" SET status = \'READY\', embedding = %s::vector WHERE id = %s', (vec(v), ref_id))
+                ready += 1
     conn.commit()
-    print(f"  fingerprinted {len(vecs)}/{len(pending)} references", flush=True)
+    print(f"  {ready}/{len(pending)} references ready", flush=True)
 
 
 def main():

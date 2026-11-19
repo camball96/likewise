@@ -5,7 +5,6 @@ import json
 import re
 import time
 import urllib.error
-import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
@@ -48,15 +47,6 @@ def fetch_store(domain: str, max_products: int) -> list[dict]:
         page += 1
         time.sleep(REQUEST_GAP_S)
     return out[:max_products]
-
-
-def fetch_product_by_url(url: str) -> dict | None:
-    """Resolve a product page URL (any /collections/... prefix) to its Shopify product JSON."""
-    u = urllib.parse.urlparse(url)
-    m = re.search(r"/products/([^/?#]+)", u.path)
-    if not m:
-        return None
-    return get_json(f"https://{u.netloc}/products/{m.group(1)}.json").get("product")
 
 
 # ---------------------------------------------------------------- classification
@@ -122,7 +112,7 @@ def size_tokens(value: str) -> list[str]:
     return ["OS" if t == "ONE SIZE" else t for t in toks]
 
 
-def normalise(store: dict, p: dict, currency: str) -> dict | None:
+def normalise(store: dict, p: dict) -> dict | None:
     title = (p.get("title") or "").strip()
     ptype = (p.get("product_type") or "").strip()
     tags = p.get("tags") or []
@@ -171,15 +161,8 @@ def normalise(store: dict, p: dict, currency: str) -> dict | None:
         "img": img,
         "price": round(price, 2),
         "compare": round(compare, 2),
-        "currency": currency,
         "cat": classify(title, ptype, tags),
         "sizes": sizes,
         "published": pub_ts,
     }
 
-
-def store_currency(domain: str) -> str:
-    try:
-        return get_json(f"https://{domain}/meta.json").get("currency") or "AUD"
-    except Exception:
-        return "AUD"

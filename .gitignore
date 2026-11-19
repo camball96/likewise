@@ -13,8 +13,6 @@ npm-debug.log*
 !.env.example
 
 # python pipeline
-.cache/
-site/data/
 __pycache__/
 *.pyc
 .venv/

@@ -7,5 +7,5 @@ export default defineConfig([
   ...nextTs,
   // product images come from many store CDNs, so plain <img> is simpler than next/image
   { rules: { "@next/next/no-img-element": "off" } },
-  globalIgnores([".next/**", "next-env.d.ts", "src/generated/**", "pipeline/**", "site/**"]),
+  globalIgnores([".next/**", "next-env.d.ts", "src/generated/**", "pipeline/**"]),
 ]);
