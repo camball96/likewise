@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- catalogue (written by the daily ingest job) ----------
+
+model Store {
+  id           String    @id // short key, e.g. "bronzesnake"
+  name         String
+  domain       String
+  active       Boolean   @default(true)
+  lastSyncedAt DateTime?
+  products     Product[]
+  outfits      Outfit[]
+}
+
+model Product {
+  id          String                      @id @default(uuid())
+  storeId     String
+  store       Store                       @relation(fields: [storeId], references: [id])
+  externalId  String
+  title       String
+  url         String
+  imageUrl    String
+  price       Float
+  compareAt   Float?
+  category    String
+  sizes       String[]
+  inStock     Boolean                     @default(true)
+  publishedAt DateTime
+  embedding   Unsupported("vector(768)")? // image fingerprint (Marqo FashionSigLIP)
+  updatedAt   DateTime                    @updatedAt
+  outfitItems OutfitItem[]
+  clicks      Click[]
+
+  @@unique([storeId, externalId])
+  @@index([storeId, inStock])
+}
+
+// ---------- user data ----------
+
+model Outfit {
+  id         String       @id @default(uuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  stores     Store[] // empty = all stores
+  items      OutfitItem[]
+  references Reference[]
+  createdAt  DateTime     @default(now())
+
+  @@index([userId])
+}
+
+enum ItemKind {
+  EXAMPLE // added by the user as a style reference
+  LIKE // hearted in the feed
+  SKIP // dismissed in the feed
+}
+
+model OutfitItem {
+  outfitId  String
+  outfit    Outfit   @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  kind      ItemKind
+  createdAt DateTime @default(now())
+
+  @@id([outfitId, productId])
+}
+
+enum ReferenceStatus {
+  PENDING // waiting for the embedding run
+  READY
+  FAILED // image couldn't be downloaded
+}
+
+// A style example from outside the catalogue: a link to any product page, Pinterest pin, Instagram post...
+model Reference {
+  id        String                      @id @default(uuid())
+  outfitId  String
+  outfit    Outfit                      @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  sourceUrl String
+  imageUrl  String
+  status    ReferenceStatus             @default(PENDING)
+  embedding Unsupported("vector(768)")?
+  createdAt DateTime                    @default(now())
+
+  @@index([outfitId])
+}
+
+model Click {
+  id        String   @id @default(uuid())
+  userId    String?
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  outfitId  String?
+  createdAt DateTime @default(now())
+}
+
+// ---------- Better Auth (shape required by better-auth) ----------
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  outfits       Outfit[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}

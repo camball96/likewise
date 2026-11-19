@@ -41,6 +41,7 @@ ZS_LABELS = {
     "Outerwear": "a photo of a woman wearing a jacket or coat",
     "Jumpsuits": "a photo of a woman wearing a jumpsuit",
     "Swim": "a photo of a woman wearing swimwear",
+    "Sleepwear": "a photo of a woman wearing pyjamas or sleepwear",
     None: "a product photo of shoes, a bag, jewellery, a hat or an accessory",
 }
 
