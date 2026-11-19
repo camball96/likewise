@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-UA = "Mozilla/5.0 (compatible; styleit/1.0; personal outfit finder)"
+UA = "Mozilla/5.0 (compatible; likewise/1.0; personal outfit finder)"
 PAGE_SIZE = 250
 REQUEST_GAP_S = 1.0  # be polite: at most ~1 request/second per store
 

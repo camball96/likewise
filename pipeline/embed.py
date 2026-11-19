@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
 MODEL_ID = "hf-hub:Marqo/marqo-fashionSigLIP"
-UA = "Mozilla/5.0 (compatible; styleit/1.0)"
+UA = "Mozilla/5.0 (compatible; likewise/1.0)"
 DOWNLOAD_WIDTH = 360  # Shopify CDN resizes on the fly; the model only needs 224px
 
 
