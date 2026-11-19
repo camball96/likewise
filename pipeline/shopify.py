@@ -66,7 +66,7 @@ EXCLUDE = re.compile(
     r"jewel(?:le)?ry|anklet|hair|scrunchie|claw clip|headband|hats?|caps?|beanie|scarf|sunglasses|socks?|"
     r"shoes?|heels?|boots?|sandals?|flats|sneakers?|slides|mules|loafers|thongs|footwear|"
     r"beauty|fragrance|perfume|candle|homewares?|towel|mug|book|sticker|keyring|phone case|"
-    r"bras?|briefs?|undies|underwear|knickers|thong brief|g-string|lingerie|sleepwear|pyjamas?|pajamas?|robe|"
+    r"bras?|briefs?|undies|underwear|knickers|thong brief|g-string|lingerie|"
     r"activewear|leggings|sports bra|bike shorts|maternity|kids?|girls|baby|"
     r"shipping protection|route|insurance|sample|gift wrap|gift box|warranty|donation)\b",
     re.I,
@@ -75,6 +75,7 @@ MENS = re.compile(r"(^|[^a-z])(mens|men's|men|male|him)([^a-z]|$)", re.I)
 
 CATEGORY_RULES: list[tuple[str, re.Pattern]] = [
     ("Dresses",     re.compile(r"\b(dress(es)?|gown|slip dress|maxi dress|midi dress|mini dress)\b", re.I)),
+    ("Sleepwear",   re.compile(r"\b(pj|pjs|pyjamas?|pajamas?|sleep\w*|lounge\w*|robe|nightie|nightdress)s?\b", re.I)),
     ("Jumpsuits",   re.compile(r"\b(jumpsuit|playsuit|romper|unitard)s?\b", re.I)),
     ("Sets",        re.compile(r"\b(set|co-?ord|two piece|2 piece|matching)s?\b", re.I)),
     ("Skirts",      re.compile(r"\b(skirt|skort)s?\b", re.I)),
