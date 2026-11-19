@@ -1,4 +1,4 @@
-"""Image/text embeddings with Marqo FashionSigLIP, plus an on-disk cache so each image is only embedded once."""
+"""Image/text fingerprints with the Marqo FashionSigLIP model."""
 from __future__ import annotations
 
 import io
@@ -6,7 +6,6 @@ import os
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import numpy as np
 
@@ -23,43 +22,6 @@ def sized_url(url: str, width: int) -> str:
     if "cdn.shopify.com" in url or "/cdn/shop/" in url:
         return url + ("&" if "?" in url else "?") + f"width={width}"
     return url
-
-
-class EmbeddingCache:
-    """keys -> float16 vectors, with a last-seen day so stale entries can be pruned."""
-
-    def __init__(self, path: Path):
-        self.path = path
-        self.vecs: dict[str, np.ndarray] = {}
-        self.seen: dict[str, int] = {}
-        if path.exists():
-            z = np.load(path, allow_pickle=False)
-            for k, v, s in zip(z["keys"], z["vecs"], z["seen"]):
-                self.vecs[str(k)] = v
-                self.seen[str(k)] = int(s)
-        self.today = int(time.time() // 86400)
-
-    def get(self, key: str):
-        v = self.vecs.get(key)
-        if v is not None:
-            self.seen[key] = self.today
-        return v
-
-    def put(self, key: str, vec: np.ndarray):
-        self.vecs[key] = vec.astype(np.float16)
-        self.seen[key] = self.today
-
-    def save(self, keep_days: int = 30):
-        keys = [k for k in self.vecs if self.today - self.seen.get(k, 0) <= keep_days]
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(".tmp.npz")
-        np.savez_compressed(
-            tmp,
-            keys=np.array(keys),
-            vecs=np.stack([self.vecs[k] for k in keys]) if keys else np.zeros((0, 768), np.float16),
-            seen=np.array([self.seen[k] for k in keys], dtype=np.int32),
-        )
-        os.replace(tmp, self.path)
 
 
 class Embedder:
@@ -88,59 +50,9 @@ class Embedder:
 def load_image(src: str):
     from PIL import Image
 
-    if src.startswith("http"):
-        req = urllib.request.Request(sized_url(src, DOWNLOAD_WIDTH), headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=30) as r:
-            data = r.read()
-        im = Image.open(io.BytesIO(data))
-    else:
-        im = Image.open(src)
-    return im.convert("RGB")
-
-
-def embed_sources(
-    embedder: Embedder,
-    cache: EmbeddingCache,
-    sources: list[str],
-    max_new: int | None = None,
-    batch: int = 32,
-    log=print,
-) -> dict[str, np.ndarray]:
-    """Return {image_key: vector} for every source we could embed (cached or new)."""
-    out: dict[str, np.ndarray] = {}
-    todo: list[str] = []
-    for s in dict.fromkeys(sources):
-        k = image_key(s)
-        v = cache.get(k)
-        if v is not None:
-            out[k] = v.astype(np.float32)
-        else:
-            todo.append(s)
-    if max_new is not None and len(todo) > max_new:
-        log(f"  {len(todo)} new images; embedding {max_new} this run (rest next run)")
-        todo = todo[:max_new]
-    log(f"  cached: {len(out)}, to embed: {len(todo)}")
-
-    t0 = time.time()
-    done = failed = 0
-    with ThreadPoolExecutor(16) as pool:
-        for i in range(0, len(todo), batch):
-            chunk = todo[i : i + batch]
-            results = list(pool.map(_safe_load, chunk))
-            ok = [(s, im) for s, im in zip(chunk, results) if im is not None]
-            failed += len(chunk) - len(ok)
-            if ok:
-                vecs = embedder.images([im for _, im in ok])
-                for (s, _), v in zip(ok, vecs):
-                    cache.put(image_key(s), v)
-                    out[image_key(s)] = v
-            done += len(chunk)
-            if (i // batch) % 10 == 0 or done == len(todo):
-                rate = done / max(1e-6, time.time() - t0)
-                log(f"  embedded {done}/{len(todo)} ({rate:.1f} img/s, {failed} failed)")
-            if (i // batch) % 50 == 49:
-                cache.save()  # checkpoint long first runs
-    return out
+    req = urllib.request.Request(sized_url(src, DOWNLOAD_WIDTH), headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return Image.open(io.BytesIO(r.read())).convert("RGB")
 
 
 def _safe_load(src: str):
@@ -148,3 +60,27 @@ def _safe_load(src: str):
         return load_image(src)
     except Exception:
         return None
+
+
+def embed_sources(embedder: Embedder, sources: list[str], max_new: int | None = None, batch: int = 32) -> dict[str, np.ndarray]:
+    """Download and fingerprint images. Returns {image_key: vector} for those that worked."""
+    todo = list(dict.fromkeys(sources))
+    if max_new is not None and len(todo) > max_new:
+        print(f"  {len(todo)} images; fingerprinting {max_new} this run (rest next run)", flush=True)
+        todo = todo[:max_new]
+
+    out: dict[str, np.ndarray] = {}
+    t0 = time.time()
+    done = failed = 0
+    with ThreadPoolExecutor(16) as pool:
+        for i in range(0, len(todo), batch):
+            chunk = todo[i : i + batch]
+            ok = [(s, im) for s, im in zip(chunk, pool.map(_safe_load, chunk)) if im is not None]
+            failed += len(chunk) - len(ok)
+            if ok:
+                for (s, _), v in zip(ok, embedder.images([im for _, im in ok])):
+                    out[image_key(s)] = v
+            done += len(chunk)
+            if (i // batch) % 10 == 0 or done == len(todo):
+                print(f"  fingerprinted {done}/{len(todo)} ({done / max(1e-6, time.time() - t0):.1f} img/s, {failed} failed)", flush=True)
+    return out

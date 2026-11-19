@@ -5,9 +5,10 @@ import { PencilIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { OutfitDialog } from "@/components/outfit-dialog";
+import { OutfitForm } from "@/components/outfit-form";
 import { ProductCard, type CardProduct } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authClient } from "@/lib/auth-client";
@@ -23,7 +24,7 @@ export default function OutfitPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-3 pb-16 sm:px-5">
-      <header className="sticky top-0 z-10 -mx-3 flex items-center gap-3 border-b bg-background/90 px-3 py-3 backdrop-blur sm:-mx-5 sm:px-5">
+      <header className="sticky top-0 z-10 -mx-3 flex items-center gap-3 border-b border-foreground/5 bg-background/85 px-3 py-3 backdrop-blur sm:-mx-5 sm:px-5">
         <Link href="/" className="font-heading text-3xl font-semibold">
           style<em className="text-[#6e4a35]">it</em>
         </Link>
@@ -32,7 +33,7 @@ export default function OutfitPage() {
             <Link
               key={o.id}
               href={`/outfits/${o.id}`}
-              className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm ${o.id === id ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
+              className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors ${o.id === id ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
             >
               {o.name}
             </Link>
@@ -47,34 +48,42 @@ export default function OutfitPage() {
       </header>
 
       {outfit && (
-        <Tabs defaultValue="feed" className="mt-4">
-          <div className="flex items-center gap-2">
+        <Tabs defaultValue="feed" className="mt-8">
+          <p className="eyebrow">Your outfit</p>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <h1 className="flex items-center gap-1 font-heading text-4xl font-semibold sm:text-5xl">
+              {outfit.name}
+              <Button variant="ghost" size="icon" aria-label="Edit outfit" onClick={() => setDialog("edit")}>
+                <PencilIcon />
+              </Button>
+            </h1>
             <TabsList>
               <TabsTrigger value="feed">For you</TabsTrigger>
               <TabsTrigger value="saved">Saved</TabsTrigger>
             </TabsList>
-            <Button variant="ghost" size="sm" onClick={() => setDialog("edit")}>
-              <PencilIcon /> Edit outfit
-            </Button>
           </div>
-          <TabsContent value="feed" className="mt-4">
+          <TabsContent value="feed" className="mt-6">
             <Feed key={outfit.id} outfitId={outfit.id} />
           </TabsContent>
-          <TabsContent value="saved" className="mt-4">
+          <TabsContent value="saved" className="mt-6">
             <Saved outfitId={outfit.id} />
           </TabsContent>
         </Tabs>
       )}
       {outfits.data && !outfit && <p className="mt-10 text-center text-muted-foreground">Outfit not found.</p>}
 
-      {dialog && (
-        <OutfitDialog
-          key={dialog + id}
-          outfit={dialog === "edit" ? outfit : undefined}
-          open
-          onOpenChange={(open) => !open && setDialog(null)}
-        />
-      )}
+      <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
+        <DialogContent showCloseButton={false} className="max-h-[90vh] overflow-y-auto bg-transparent p-0 ring-0 sm:max-w-md">
+          {dialog && (
+            <OutfitForm
+              key={dialog + id}
+              outfit={dialog === "edit" ? outfit : undefined}
+              title={dialog === "edit" ? "Edit outfit" : "New outfit"}
+              onCancel={() => setDialog(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -142,7 +151,12 @@ function Feed({ outfitId }: { outfitId: string }) {
         ))}
       </div>
       <div ref={sentinel} />
-      {done && products.length === 0 && <p className="py-16 text-center text-muted-foreground">Nothing to show yet.</p>}
+      {done && products.length === 0 && (
+        <div className="py-20 text-center">
+          <p className="font-heading text-3xl font-semibold">Nothing here yet</p>
+          <p className="mt-2 text-muted-foreground">New pieces arrive every morning. Try adding more stores to this outfit.</p>
+        </div>
+      )}
     </>
   );
 }
@@ -178,8 +192,9 @@ function Saved({ outfitId }: { outfitId: string }) {
   return (
     <div className="grid gap-8">
       <section>
-        <h2 className="font-heading text-2xl font-semibold">Style references</h2>
-        <p className="mb-3 text-sm text-muted-foreground">
+        <p className="eyebrow">Inspiration</p>
+        <h2 className="mt-1 font-heading text-3xl font-semibold">Style references</h2>
+        <p className="mt-1 mb-4 text-sm text-muted-foreground">
           Paste a link to anything you love: a product page from any store, a Pinterest pin, an Instagram post. The feed ranks everything by how close it looks.
         </p>
         <form
@@ -220,7 +235,8 @@ function Saved({ outfitId }: { outfitId: string }) {
         </Grid>
       </section>
       <section>
-        <h2 className="font-heading text-2xl font-semibold">Hearted</h2>
+        <p className="eyebrow">Saved from your feed</p>
+        <h2 className="mt-1 font-heading text-3xl font-semibold">Hearted</h2>
         {likes.length === 0 && <p className="text-sm text-muted-foreground">Tap the heart on anything you like in the feed.</p>}
         <Grid>
           {likes.map((i) => (
