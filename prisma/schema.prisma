@@ -27,6 +27,8 @@ model Product {
   title       String
   url         String
   imageUrl    String
+  hoverImageUrl String? // second product photo, shown on hover
+  colour      String? // one of the COLOURS in pipeline/ingest.py, for the colour filter
   price       Float
   compareAt   Float?
   category    String
