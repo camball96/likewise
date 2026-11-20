@@ -1,10 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PencilIcon, PlusIcon } from "lucide-react";
+import { Loader2Icon, PencilIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Analysing } from "@/components/analysing";
+import { SavedLists } from "@/components/lists";
 import { FeedFilters, filterCount, NO_FILTERS, type Filters } from "@/components/feed-filters";
 import { OutfitForm } from "@/components/outfit-form";
 import { ProductCard, type CardProduct } from "@/components/product-card";
@@ -62,7 +64,7 @@ export default function OutfitPage() {
 
       {outfit && (
         <Tabs defaultValue="feed" className="mt-8">
-          <p className="eyebrow">Your outfit</p>
+          <p className="eyebrow">Curated outfit</p>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <h1 className="flex items-center gap-1 font-heading text-4xl font-semibold sm:text-5xl">
               {outfit.name}
@@ -71,18 +73,18 @@ export default function OutfitPage() {
               </Button>
             </h1>
             <TabsList>
-              <TabsTrigger value="feed">For you</TabsTrigger>
+              <TabsTrigger value="feed">Picked for you</TabsTrigger>
               <TabsTrigger value="saved">Saved</TabsTrigger>
             </TabsList>
           </div>
           <TabsContent value="feed" className="mt-6">
             <FeedFilters key={id} value={filters} onChange={setFilters} />
+            <Analysing references={references.filter((r) => r.status === "PENDING")} />
             <Feed
               key={`${outfit.id}-${ready}-${JSON.stringify(filters)}`}
               outfitId={outfit.id}
               filters={filters}
               onClearFilters={() => setFilters(NO_FILTERS)}
-              analysing={references.some((r) => r.status === "PENDING")}
               categories={outfit.categories}
               storeCount={outfit.stores.length}
               onEdit={() => setDialog("edit")}
@@ -127,7 +129,6 @@ function Feed({
   outfitId,
   filters,
   onClearFilters,
-  analysing,
   categories,
   storeCount,
   onEdit,
@@ -135,7 +136,6 @@ function Feed({
   outfitId: string;
   filters: Filters;
   onClearFilters: () => void;
-  analysing: boolean;
   categories: string[];
   storeCount: number;
   onEdit: () => void;
@@ -186,22 +186,25 @@ function Feed({
 
   return (
     <>
-      {analysing && (
-        <p className="mb-4 rounded-xl bg-secondary/60 px-4 py-3 text-sm">
-          We&apos;re still analysing some of your inspiration links. The feed sharpens once they&apos;re done (usually a minute or two).
-        </p>
-      )}
       <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
         {products.map((p) => (
-          <ProductCard key={p.id} product={p} outfitId={outfitId} liked={liked.has(p.id)} onLike={() => like(p.id)} onSkip={() => skip(p.id)} />
+          <ProductCard
+            key={p.id}
+            product={p}
+            outfitId={outfitId}
+            liked={liked.has(p.id)}
+            onLike={() => like(p.id)}
+            onSkip={() => skip(p.id)}
+            onListed={() => setLiked((s) => new Set(s).add(p.id))}
+          />
         ))}
       </div>
       <div ref={sentinel} />
       {done && products.length === 0 && filterCount(filters) > 0 && (
         <div className="mx-auto max-w-md py-20 text-center">
-          <p className="eyebrow">No matches</p>
+          <p className="eyebrow">Nothing in this edit</p>
           <p className="mt-2 font-heading text-3xl font-semibold">Nothing matches these filters right now</p>
-          <p className="mt-3 text-sm text-muted-foreground">Try removing a filter or two. New pieces arrive every morning.</p>
+          <p className="mt-3 text-sm text-muted-foreground">Try loosening a filter or two. Fresh picks land every morning.</p>
           <Button className="mt-6" onClick={onClearFilters}>
             Clear filters
           </Button>
@@ -209,13 +212,13 @@ function Feed({
       )}
       {done && products.length === 0 && filterCount(filters) === 0 && (
         <div className="mx-auto max-w-md py-20 text-center">
-          <p className="eyebrow">No matches yet</p>
+          <p className="eyebrow">Still searching</p>
           <p className="mt-2 font-heading text-3xl font-semibold">
             We couldn&apos;t find any {categories.length ? categories.join(", ").toLowerCase() : "pieces"} in{" "}
             {storeCount === 0 ? "our stores" : storeCount === 1 ? "the store you picked" : `the ${storeCount} stores you picked`} right now
           </p>
           <p className="mt-3 text-sm text-muted-foreground">
-            New pieces arrive every morning. In the meantime, try editing this outfit&apos;s inspiration links or categories.
+            Every morning we go through the new arrivals for you. In the meantime, try fine-tuning this outfit&apos;s inspiration links or categories.
           </p>
           <Button className="mt-6" onClick={onEdit}>
             <PencilIcon /> Edit outfit
@@ -224,7 +227,7 @@ function Feed({
       )}
       {done && products.length > 0 && (
         <p className="py-12 text-center text-sm text-muted-foreground">
-          That&apos;s everything that matches for now. New pieces arrive every morning.
+          That&apos;s your full edit for now. Fresh picks land every morning.
         </p>
       )}
     </>
@@ -260,12 +263,13 @@ function Saved({ outfitId }: { outfitId: string }) {
   const unsave = (productId: string) => setItem.mutate({ outfitId, productId, kind: null });
 
   return (
-    <div className="grid gap-8">
-      <section>
-        <p className="eyebrow">Inspiration</p>
+    <div className="grid gap-10">
+      <SavedLists outfitId={outfitId} />
+      <section className="border-t border-foreground/10 pt-10">
+        <p className="eyebrow">Your taste</p>
         <h2 className="mt-1 font-heading text-3xl font-semibold">Style references</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          Paste a link to anything you love: a product page from any store, a Pinterest pin, an Instagram post. The feed ranks everything by how close it looks.
+          Paste a link to anything you love: a product page from any store, a Pinterest pin, an Instagram post. Everything you add here shapes what we pick for you.
         </p>
         <form
           className="flex max-w-xl gap-2"
@@ -286,7 +290,8 @@ function Saved({ outfitId }: { outfitId: string }) {
               <a href={r.sourceUrl} target="_blank" rel="noopener" className="relative block aspect-[3/4] overflow-hidden rounded-2xl bg-secondary">
                 <img src={r.imageUrl} alt="" className="size-full object-cover" />
                 {r.status !== "READY" && (
-                  <span className="absolute inset-x-2 top-2 rounded-full bg-card/90 px-2 py-1 text-center text-xs">
+                  <span className="absolute inset-x-2 top-2 flex items-center justify-center gap-1.5 rounded-full bg-card/90 px-2 py-1 text-xs">
+                    {r.status === "PENDING" && <Loader2Icon className="size-3.5 animate-spin" />}
                     {r.status === "PENDING" ? "Analysing…" : "Couldn't read this image"}
                   </span>
                 )}
@@ -304,8 +309,8 @@ function Saved({ outfitId }: { outfitId: string }) {
           ))}
         </Grid>
       </section>
-      <section>
-        <p className="eyebrow">Saved from your feed</p>
+      <section className="border-t border-foreground/10 pt-10">
+        <p className="eyebrow">Saved from your picks</p>
         <h2 className="mt-1 font-heading text-3xl font-semibold">Hearted</h2>
         {likes.length === 0 && <p className="text-sm text-muted-foreground">Tap the heart on anything you like in the feed.</p>}
         <Grid>

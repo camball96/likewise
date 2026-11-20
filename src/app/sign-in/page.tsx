@@ -37,12 +37,12 @@ export default function SignInPage() {
           <p className="font-heading text-3xl font-semibold">
             like<em className="text-[#6e4a35]">wise</em>
           </p>
-          <p className="eyebrow mt-10">Australian fashion, matched to you</p>
+          <p className="eyebrow mt-10">Australian fashion, chosen for you</p>
           <h1 className="mt-3 font-heading text-5xl leading-[1.05] font-semibold sm:text-6xl">
             Clothes you&apos;ll <em className="text-[#6e4a35]">actually</em> love
           </h1>
           <p className="mt-4 text-muted-foreground">
-            Show us a few pieces you love and we&apos;ll find more like them across 29 Australian stores, ranked by how they look.
+            Show us a few pieces you love and we&apos;ll hand-pick more like them from Australia&apos;s best stores, tailored to your taste.
           </p>
           <Steps className="mt-6 max-md:hidden" />
         </section>

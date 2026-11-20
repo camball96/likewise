@@ -20,25 +20,26 @@ model Store {
 }
 
 model Product {
-  id          String                      @id @default(uuid())
-  storeId     String
-  store       Store                       @relation(fields: [storeId], references: [id])
-  externalId  String
-  title       String
-  url         String
-  imageUrl    String
+  id            String                      @id @default(uuid())
+  storeId       String
+  store         Store                       @relation(fields: [storeId], references: [id])
+  externalId    String
+  title         String
+  url           String
+  imageUrl      String
   hoverImageUrl String? // second product photo, shown on hover
-  colour      String? // one of the COLOURS in pipeline/ingest.py, for the colour filter
-  price       Float
-  compareAt   Float?
-  category    String
-  sizes       String[]
-  inStock     Boolean                     @default(true)
-  publishedAt DateTime
-  embedding   Unsupported("vector(768)")? // image fingerprint (Marqo FashionSigLIP)
-  updatedAt   DateTime                    @updatedAt
-  outfitItems OutfitItem[]
-  clicks      Click[]
+  colour        String? // one of the COLOURS in pipeline/ingest.py, for the colour filter
+  price         Float
+  compareAt     Float?
+  category      String
+  sizes         String[]
+  inStock       Boolean                     @default(true)
+  publishedAt   DateTime
+  embedding     Unsupported("vector(768)")? // image fingerprint (Marqo FashionSigLIP)
+  updatedAt     DateTime                    @updatedAt
+  outfitItems   OutfitItem[]
+  listItems     ListItem[]
+  clicks        Click[]
 
   @@unique([storeId, externalId])
   @@index([storeId, inStock])
@@ -97,6 +98,28 @@ model Reference {
   @@index([outfitId])
 }
 
+// A named wishlist, e.g. "Sarah's wedding". Belongs to the user, so it can hold pieces from any outfit.
+model List {
+  id        String     @id @default(uuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  items     ListItem[]
+  createdAt DateTime   @default(now())
+
+  @@index([userId])
+}
+
+model ListItem {
+  listId    String
+  list      List     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([listId, productId])
+}
+
 model Click {
   id        String   @id @default(uuid())
   userId    String?
@@ -119,6 +142,7 @@ model User {
   sessions      Session[]
   accounts      Account[]
   outfits       Outfit[]
+  lists         List[]
 
   @@map("user")
 }

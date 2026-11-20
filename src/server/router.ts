@@ -104,6 +104,83 @@ export const appRouter = router({
       }),
   }),
 
+  // Named wishlists ("Sarah's wedding"). They belong to the user, so one list can hold pieces from any outfit.
+  lists: router({
+    all: protectedProcedure.query(({ ctx }) =>
+      ctx.db.list.findMany({
+        where: { userId: ctx.user.id },
+        orderBy: { createdAt: "asc" },
+        include: {
+          items: {
+            orderBy: { createdAt: "desc" },
+            include: { product: { include: { store: true } } },
+          },
+        },
+      }),
+    ),
+
+    create: protectedProcedure
+      .input(z.object({ name: z.string().trim().min(1).max(40) }))
+      .mutation(({ ctx, input }) => ctx.db.list.create({ data: { name: input.name, userId: ctx.user.id } })),
+
+    rename: protectedProcedure
+      .input(z.object({ id: z.string(), name: z.string().trim().min(1).max(40) }))
+      .mutation(({ ctx, input }) =>
+        ctx.db.list.updateMany({
+          where: { id: input.id, userId: ctx.user.id },
+          data: { name: input.name },
+        }),
+      ),
+
+    delete: protectedProcedure.input(z.object({ id: z.string() })).mutation(({ ctx, input }) =>
+      ctx.db.list.deleteMany({
+        where: { id: input.id, userId: ctx.user.id },
+      }),
+    ),
+
+    // Adding a piece to a list also hearts it in the outfit it was saved from (an existing example stays an example).
+    toggle: protectedProcedure
+      .input(
+        z.object({
+          listId: z.string(),
+          productId: z.string(),
+          outfitId: z.string(),
+          add: z.boolean(),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const list = await ctx.db.list.findFirst({
+          where: { id: input.listId, userId: ctx.user.id },
+        });
+        if (!list) throw new TRPCError({ code: "NOT_FOUND" });
+        const key = { listId: input.listId, productId: input.productId };
+        if (!input.add) {
+          await ctx.db.listItem.deleteMany({ where: key });
+          return;
+        }
+        await ownOutfit(ctx, input.outfitId);
+        await ctx.db.listItem.upsert({
+          where: { listId_productId: key },
+          create: key,
+          update: {},
+        });
+        await ctx.db.outfitItem.upsert({
+          where: {
+            outfitId_productId: {
+              outfitId: input.outfitId,
+              productId: input.productId,
+            },
+          },
+          create: {
+            outfitId: input.outfitId,
+            productId: input.productId,
+            kind: "LIKE",
+          },
+          update: {},
+        });
+      }),
+  }),
+
   // Products ranked by closeness to the outfit's examples, link references and hearts (hearts count double).
   // With no examples yet, newest first.
   feed: protectedProcedure
