@@ -4,8 +4,10 @@ export type CardProduct = {
   id: string;
   title: string;
   imageUrl: string;
+  hoverImageUrl?: string | null;
   price: number;
   compareAt: number | null;
+  isNew?: boolean; // published in the last week (worked out by the feed query)
   store: string;
 };
 
@@ -28,12 +30,31 @@ export function ProductCard({
 }) {
   const href = `/go/${product.id}?outfit=${outfitId}`;
   const onSale = product.compareAt && product.compareAt > product.price;
+  const badge = onSale ? `−${Math.round((1 - product.price / product.compareAt!) * 100)}%` : product.isNew ? "New" : null;
 
   return (
     <article className="min-w-0">
       <div className="relative">
-        <a href={href} target="_blank" rel="noopener" className="block aspect-[3/4] overflow-hidden rounded-2xl bg-secondary">
+        <a href={href} target="_blank" rel="noopener" className="group relative block aspect-[3/4] overflow-hidden rounded-2xl bg-secondary">
           <img src={sized(product.imageUrl, 540)} alt={product.title} loading="lazy" className="size-full object-cover" />
+          {/* second photo fades in on hover (desktop) */}
+          {product.hoverImageUrl && (
+            <img
+              src={sized(product.hoverImageUrl, 540)}
+              alt=""
+              loading="lazy"
+              className="absolute inset-0 size-full object-cover opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+            />
+          )}
+          {badge && (
+            <span
+              className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                onSale ? "bg-destructive text-white" : "bg-card text-foreground"
+              }`}
+            >
+              {badge}
+            </span>
+          )}
         </a>
         <div className="absolute inset-x-2 bottom-2 flex justify-between">
           {onSkip ? (

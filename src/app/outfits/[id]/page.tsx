@@ -5,6 +5,7 @@ import { PencilIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FeedFilters, filterCount, NO_FILTERS, type Filters } from "@/components/feed-filters";
 import { OutfitForm } from "@/components/outfit-form";
 import { ProductCard, type CardProduct } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authClient } from "@/lib/auth-client";
-import { useTRPC } from "@/lib/trpc";
+import { useTRPC, useTRPCClient } from "@/lib/trpc";
 
 export default function OutfitPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,6 +30,10 @@ export default function OutfitPage() {
   });
   const references = saved.data?.references ?? [];
   const ready = references.filter((r) => r.status === "READY").length;
+  // filters belong to the outfit being viewed; switching outfits starts unfiltered
+  const [filterState, setFilterState] = useState({ outfitId: id, value: NO_FILTERS });
+  const filters = filterState.outfitId === id ? filterState.value : NO_FILTERS;
+  const setFilters = (value: Filters) => setFilterState({ outfitId: id, value });
 
   return (
     <div className="mx-auto max-w-6xl px-3 pb-16 sm:px-5">
@@ -71,7 +76,17 @@ export default function OutfitPage() {
             </TabsList>
           </div>
           <TabsContent value="feed" className="mt-6">
-            <Feed key={`${outfit.id}-${ready}`} outfitId={outfit.id} analysing={references.some((r) => r.status === "PENDING")} />
+            <FeedFilters key={id} value={filters} onChange={setFilters} />
+            <Feed
+              key={`${outfit.id}-${ready}-${JSON.stringify(filters)}`}
+              outfitId={outfit.id}
+              filters={filters}
+              onClearFilters={() => setFilters(NO_FILTERS)}
+              analysing={references.some((r) => r.status === "PENDING")}
+              categories={outfit.categories}
+              storeCount={outfit.stores.length}
+              onEdit={() => setDialog("edit")}
+            />
           </TabsContent>
           <TabsContent value="saved" className="mt-6">
             <Saved outfitId={outfit.id} />
@@ -108,9 +123,24 @@ function useSetItem(outfitId: string) {
 
 // Infinite feed: each page asks the server for the next best matches, excluding what's already shown.
 // Hearts and skips are saved immediately, so later pages reflect them.
-function Feed({ outfitId, analysing }: { outfitId: string; analysing: boolean }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
+function Feed({
+  outfitId,
+  filters,
+  onClearFilters,
+  analysing,
+  categories,
+  storeCount,
+  onEdit,
+}: {
+  outfitId: string;
+  filters: Filters;
+  onClearFilters: () => void;
+  analysing: boolean;
+  categories: string[];
+  storeCount: number;
+  onEdit: () => void;
+}) {
+  const client = useTRPCClient(); // feed pages aren't cached: each one depends on what's already been shown
   const setItem = useSetItem(outfitId);
   const [products, setProducts] = useState<CardProduct[]>([]);
   const [liked, setLiked] = useState<Set<string>>(new Set());
@@ -122,12 +152,15 @@ function Feed({ outfitId, analysing }: { outfitId: string; analysing: boolean })
   const loadMore = useCallback(async () => {
     if (loading.current || done) return;
     loading.current = true;
-    const page = await queryClient.fetchQuery({ ...trpc.feed.queryOptions({ outfitId, exclude: shown.current }), staleTime: 0 });
-    shown.current.push(...page.map((p) => p.id));
-    setProducts((prev) => [...prev, ...page]);
-    if (page.length === 0) setDone(true);
-    loading.current = false;
-  }, [done, outfitId, queryClient, trpc]);
+    try {
+      const page = await client.feed.query({ outfitId, exclude: [...shown.current], ...filters });
+      shown.current.push(...page.map((p) => p.id));
+      setProducts((prev) => [...prev, ...page]);
+      if (page.length === 0) setDone(true);
+    } finally {
+      loading.current = false;
+    }
+  }, [client, done, filters, outfitId]);
 
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => entries[0].isIntersecting && loadMore(), { rootMargin: "800px" });
@@ -164,11 +197,35 @@ function Feed({ outfitId, analysing }: { outfitId: string; analysing: boolean })
         ))}
       </div>
       <div ref={sentinel} />
-      {done && products.length === 0 && (
-        <div className="py-20 text-center">
-          <p className="font-heading text-3xl font-semibold">Nothing here yet</p>
-          <p className="mt-2 text-muted-foreground">New pieces arrive every morning. Try adding more stores to this outfit.</p>
+      {done && products.length === 0 && filterCount(filters) > 0 && (
+        <div className="mx-auto max-w-md py-20 text-center">
+          <p className="eyebrow">No matches</p>
+          <p className="mt-2 font-heading text-3xl font-semibold">Nothing matches these filters right now</p>
+          <p className="mt-3 text-sm text-muted-foreground">Try removing a filter or two. New pieces arrive every morning.</p>
+          <Button className="mt-6" onClick={onClearFilters}>
+            Clear filters
+          </Button>
         </div>
+      )}
+      {done && products.length === 0 && filterCount(filters) === 0 && (
+        <div className="mx-auto max-w-md py-20 text-center">
+          <p className="eyebrow">No matches yet</p>
+          <p className="mt-2 font-heading text-3xl font-semibold">
+            We couldn&apos;t find any {categories.length ? categories.join(", ").toLowerCase() : "pieces"} in{" "}
+            {storeCount === 0 ? "our stores" : storeCount === 1 ? "the store you picked" : `the ${storeCount} stores you picked`} right now
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            New pieces arrive every morning. In the meantime, try editing this outfit&apos;s inspiration links or categories.
+          </p>
+          <Button className="mt-6" onClick={onEdit}>
+            <PencilIcon /> Edit outfit
+          </Button>
+        </div>
+      )}
+      {done && products.length > 0 && (
+        <p className="py-12 text-center text-sm text-muted-foreground">
+          That&apos;s everything that matches for now. New pieces arrive every morning.
+        </p>
       )}
     </>
   );

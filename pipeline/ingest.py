@@ -12,6 +12,7 @@ import argparse
 import functools
 import json
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -113,18 +114,19 @@ def ingest_products(conn, max_new: int):
         if not it["cat"]:
             continue  # not labelled yet (no fingerprint this run) or not clothing
         rows.append((
-            it["store"], it["id"].split(":", 1)[1], it["title"], it["url"], it["img"], it["price"],
+            it["store"], it["id"].split(":", 1)[1], it["title"], it["url"], it["img"], it["img2"], it["price"],
             it["compare"] or None, it["cat"], it["sizes"], it["published"], vec(v) if v is not None else None,
         ))
 
     with conn.cursor() as cur:
         cur.executemany(
             """
-            INSERT INTO "Product" (id, "storeId", "externalId", title, url, "imageUrl", price, "compareAt",
+            INSERT INTO "Product" (id, "storeId", "externalId", title, url, "imageUrl", "hoverImageUrl", price, "compareAt",
                                    category, sizes, "inStock", "publishedAt", embedding, "updatedAt")
-            VALUES (gen_random_uuid()::text, %s, %s, %s, %s, %s, %s, %s, %s, %s, true, to_timestamp(%s), %s::vector, now())
+            VALUES (gen_random_uuid()::text, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, true, to_timestamp(%s), %s::vector, now())
             ON CONFLICT ("storeId", "externalId") DO UPDATE SET
-              title = EXCLUDED.title, url = EXCLUDED.url, "imageUrl" = EXCLUDED."imageUrl", price = EXCLUDED.price,
+              title = EXCLUDED.title, url = EXCLUDED.url, "imageUrl" = EXCLUDED."imageUrl",
+              "hoverImageUrl" = EXCLUDED."hoverImageUrl", price = EXCLUDED.price,
               "compareAt" = EXCLUDED."compareAt", category = EXCLUDED.category, sizes = EXCLUDED.sizes,
               "inStock" = true, embedding = COALESCE(EXCLUDED.embedding, "Product".embedding), "updatedAt" = now()
             """,
@@ -141,6 +143,53 @@ def ingest_products(conn, max_new: int):
             cur.execute('UPDATE "Store" SET "lastSyncedAt" = now() WHERE id = %s', (store_key,))
     conn.commit()
     print(f"  upserted {len(rows)} products", flush=True)
+
+
+# Colour filter. A colour word in the title wins ("Suzie Top Bianco"); otherwise the image model picks
+# the closest description. Must match COLOURS in src/components/feed-filters.tsx.
+COLOURS = {
+    "Black": (r"black|noir|onyx|jet", "black"),
+    "White": (r"white|ivory|bianco|blanc|porcelain|pearl", "white or ivory"),
+    "Cream": (r"cream|beige|oat|oatmeal|sand|stone|ecru|natural|nude|taupe|camel|latte|vanilla|biscuit", "cream or beige"),
+    "Brown": (r"brown|chocolate|choc|mocha|espresso|coffee|cocoa|chestnut|tan|caramel|cognac", "brown or chocolate"),
+    "Grey": (r"grey|gray|charcoal|slate|ash|silver", "grey"),
+    "Red": (r"red|burgundy|wine|cherry|scarlet|crimson|maroon|merlot|sangria|berry", "red or burgundy"),
+    "Pink": (r"pink|blush|fuchsia|magenta", "pink"),
+    "Orange": (r"orange|rust|terracotta|tangerine|coral|apricot|peach", "orange"),
+    "Yellow": (r"yellow|butter|lemon|mustard|gold|golden|marigold", "yellow"),
+    "Green": (r"green|olive|sage|khaki|emerald|mint|forest|pistachio|lime|moss", "green"),
+    "Blue": (r"blue|navy|denim|cobalt|sky|azure|teal|aqua|indigo|powder", "blue or navy"),
+    "Purple": (r"purple|lilac|lavender|violet|plum|mauve|grape", "purple or lilac"),
+    "Print": (r"print|printed|floral|stripe|striped|check|plaid|leopard|zebra|paisley|gingham|polka|multi", "a colourful print or pattern"),
+}
+
+
+def label_colours(conn):
+    """Give every fingerprinted product without a colour one (backfills existing products too)."""
+    with conn.cursor() as cur:
+        cur.execute('SELECT id, title, embedding::text FROM "Product" WHERE colour IS NULL AND embedding IS NOT NULL')
+        rows = cur.fetchall()
+    if not rows:
+        print("  all products have a colour", flush=True)
+        return
+    names = list(COLOURS)
+    T = get_embedder().text([f"a photo of a woman wearing {desc} clothing" for _, desc in COLOURS.values()])
+    pattern = {name: re.compile(rf"\b({rx})\b", re.I) for name, (rx, _) in COLOURS.items()}
+    updates = []
+    for pid, title, emb in rows:
+        named = [n for n in names if pattern[n].search(title)]
+        if "Print" in named or len(named) == 1:
+            colour = "Print" if "Print" in named else named[0]
+        else:
+            # no single colour word: ask the model, limited to the colours named in the title if there are several
+            scores = np.fromstring(emb.strip("[]"), sep=",", dtype=np.float32) @ T.T
+            options = [names.index(n) for n in named] or range(len(names))
+            colour = names[max(options, key=lambda i: scores[i])]
+        updates.append((colour, pid))
+    with conn.cursor() as cur:
+        cur.executemany('UPDATE "Product" SET colour = %s WHERE id = %s', updates)
+    conn.commit()
+    print(f"  labelled {len(updates)} products", flush=True)
 
 
 def ingest_references(conn):
@@ -175,6 +224,8 @@ def main():
         if not args.references_only:
             print("[products]", flush=True)
             ingest_products(conn, args.max_new)
+            print("[colours]", flush=True)
+            label_colours(conn)
         print("[references]", flush=True)
         ingest_references(conn)
     print(f"done in {time.time() - t0:.0f}s")

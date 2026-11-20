@@ -159,6 +159,7 @@ def normalise(store: dict, p: dict) -> dict | None:
         "title": title,
         "url": f"https://{store['domain']}/products/{p['handle']}",
         "img": img,
+        "img2": p["images"][1]["src"] if len(p["images"]) > 1 else None,
         "price": round(price, 2),
         "compare": round(compare, 2),
         "cat": classify(title, ptype, tags),

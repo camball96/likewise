@@ -9,8 +9,10 @@ type FeedProduct = {
   title: string;
   url: string;
   imageUrl: string;
+  hoverImageUrl: string | null;
   price: number;
   compareAt: number | null;
+  isNew: boolean;
   store: string;
 };
 
@@ -105,7 +107,18 @@ export const appRouter = router({
   // Products ranked by closeness to the outfit's examples, link references and hearts (hearts count double).
   // With no examples yet, newest first.
   feed: protectedProcedure
-    .input(z.object({ outfitId: z.string(), exclude: z.array(z.string()).max(2000) }))
+    .input(
+      z.object({
+        outfitId: z.string(),
+        exclude: z.array(z.string()).max(2000),
+        // quick filters from the feed's Filters button
+        sizes: z.array(z.string()).default([]),
+        colours: z.array(z.string()).default([]),
+        maxPrice: z.number().positive().nullable().default(null),
+        sale: z.boolean().default(false),
+        fresh: z.boolean().default(false),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const outfit = await ownOutfit(ctx, input.outfitId);
       const storeIds = outfit.stores.map((s) => s.id);
@@ -119,11 +132,17 @@ export const appRouter = router({
           UNION ALL
           SELECT r.embedding FROM "Reference" r WHERE r."outfitId" = ${outfit.id} AND r.status = 'READY'
         ), taste AS (SELECT avg(embedding) AS v FROM pos)
-        SELECT p.id, p.title, p.url, p."imageUrl", p.price, p."compareAt", s.name AS store
+        SELECT p.id, p.title, p.url, p."imageUrl", p."hoverImageUrl", p.price, p."compareAt",
+               p."publishedAt" > now() - interval '7 days' AS "isNew", s.name AS store
         FROM "Product" p JOIN "Store" s ON s.id = p."storeId" CROSS JOIN taste
         WHERE p."inStock" AND s.active AND p.embedding IS NOT NULL
           AND (cardinality(${storeIds}::text[]) = 0 OR p."storeId" = ANY(${storeIds}::text[]))
           AND (cardinality(${outfit.categories}::text[]) = 0 OR p.category = ANY(${outfit.categories}::text[]))
+          AND (cardinality(${input.sizes}::text[]) = 0 OR cardinality(p.sizes) = 0 OR 'OS' = ANY(p.sizes) OR p.sizes && ${input.sizes}::text[])
+          AND (cardinality(${input.colours}::text[]) = 0 OR p.colour = ANY(${input.colours}::text[]))
+          AND (${input.maxPrice}::float8 IS NULL OR p.price <= ${input.maxPrice}::float8)
+          AND (NOT ${input.sale}::boolean OR p."compareAt" > p.price)
+          AND (NOT ${input.fresh}::boolean OR p."publishedAt" > now() - interval '7 days')
           AND NOT (p.id = ANY(${input.exclude}::text[]))
           AND NOT EXISTS (SELECT 1 FROM "OutfitItem" i WHERE i."outfitId" = ${outfit.id} AND i."productId" = p.id)
         ORDER BY (p.embedding <=> taste.v) NULLS LAST, p."publishedAt" DESC
