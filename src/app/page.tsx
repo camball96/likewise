@@ -42,7 +42,7 @@ export default function Home() {
           </h1>
           <p className="mt-4 text-muted-foreground">
             An outfit is a look you&apos;re shopping for, like &ldquo;Formal dresses&rdquo; or &ldquo;PJs&rdquo;. Show us a few pieces you love and we&apos;ll
-            find more like them from Australian stores.
+            build an edit of pieces chosen just for you.
           </p>
           <Steps className="mt-6" />
           <Button

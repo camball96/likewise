@@ -3,12 +3,24 @@
 import { SlidersHorizontalIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 
 // Quick filters on an outfit's feed. They aren't saved: categories and stores are the outfit's lasting settings.
-export type Filters = { sizes: string[]; colours: string[]; maxPrice: number | null; sale: boolean; fresh: boolean };
-export const NO_FILTERS: Filters = { sizes: [], colours: [], maxPrice: null, sale: false, fresh: false };
+export type Filters = {
+  sizes: string[];
+  colours: string[];
+  maxPrice: number | null;
+  sale: boolean;
+  fresh: boolean;
+};
+export const NO_FILTERS: Filters = {
+  sizes: [],
+  colours: [],
+  maxPrice: null,
+  sale: false,
+  fresh: false,
+};
 
 // size tokens the pipeline extracts from each product's in-stock variants
 const SIZES = ["XS", "S", "M", "L", "XL", "6", "8", "10", "12", "14", "16"];
@@ -39,9 +51,22 @@ export function FeedFilters({ value, onChange }: { value: Filters; onChange: (f:
   const count = filterCount(value);
 
   const pills = [
-    ...value.sizes.map((s) => ({ label: `Size ${s}`, clear: { ...value, sizes: value.sizes.filter((x) => x !== s) } })),
-    ...value.colours.map((c) => ({ label: c, clear: { ...value, colours: value.colours.filter((x) => x !== c) } })),
-    ...(value.maxPrice ? [{ label: `Under $${value.maxPrice}`, clear: { ...value, maxPrice: null } }] : []),
+    ...value.sizes.map((s) => ({
+      label: `Size ${s}`,
+      clear: { ...value, sizes: value.sizes.filter((x) => x !== s) },
+    })),
+    ...value.colours.map((c) => ({
+      label: c,
+      clear: { ...value, colours: value.colours.filter((x) => x !== c) },
+    })),
+    ...(value.maxPrice
+      ? [
+          {
+            label: `Under $${value.maxPrice}`,
+            clear: { ...value, maxPrice: null },
+          },
+        ]
+      : []),
     ...(value.sale ? [{ label: "On sale", clear: { ...value, sale: false } }] : []),
     ...(value.fresh ? [{ label: "New this week", clear: { ...value, fresh: false } }] : []),
   ];
@@ -57,7 +82,9 @@ export function FeedFilters({ value, onChange }: { value: Filters; onChange: (f:
         }}
       >
         <SlidersHorizontalIcon /> Filters
-        {count > 0 && <span className="ml-1 grid size-5 place-items-center rounded-full bg-primary text-[11px] text-primary-foreground">{count}</span>}
+        {count > 0 && (
+          <span className="ml-1 grid size-5 place-items-center rounded-full bg-primary text-[11px] text-primary-foreground">{count}</span>
+        )}
       </Button>
       {pills.map((p) => (
         <button key={p.label} onClick={() => onChange(p.clear)} className="flex items-center gap-1 rounded-full bg-secondary px-3 py-1 text-sm">
@@ -65,11 +92,14 @@ export function FeedFilters({ value, onChange }: { value: Filters; onChange: (f:
         </button>
       ))}
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent showCloseButton={false} className="bg-transparent p-0 ring-0 sm:max-w-md">
-          <div className="panel grid gap-6">
-            <h2 className="font-heading text-3xl font-semibold">Filters</h2>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent className="gap-0 bg-card data-[side=right]:w-full data-[side=right]:sm:max-w-md sm:rounded-l-3xl">
+          <div className="p-6 pb-2">
+            <p className="eyebrow">Refine your feed</p>
+            <SheetTitle className="mt-1 text-3xl font-semibold">Filters</SheetTitle>
+          </div>
 
+          <div className="grid flex-1 content-start gap-6 overflow-y-auto p-6">
             <div className="grid gap-2">
               <Label>Size in stock</Label>
               <div className="flex flex-wrap gap-1.5">
@@ -77,7 +107,12 @@ export function FeedFilters({ value, onChange }: { value: Filters; onChange: (f:
                   <Chip
                     key={s}
                     on={draft.sizes.includes(s)}
-                    onClick={() => setDraft({ ...draft, sizes: draft.sizes.includes(s) ? draft.sizes.filter((x) => x !== s) : [...draft.sizes, s] })}
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        sizes: draft.sizes.includes(s) ? draft.sizes.filter((x) => x !== s) : [...draft.sizes, s],
+                      })
+                    }
                   >
                     {s}
                   </Chip>
@@ -93,7 +128,10 @@ export function FeedFilters({ value, onChange }: { value: Filters; onChange: (f:
                     key={name}
                     on={draft.colours.includes(name)}
                     onClick={() =>
-                      setDraft({ ...draft, colours: draft.colours.includes(name) ? draft.colours.filter((x) => x !== name) : [...draft.colours, name] })
+                      setDraft({
+                        ...draft,
+                        colours: draft.colours.includes(name) ? draft.colours.filter((x) => x !== name) : [...draft.colours, name],
+                      })
                     }
                   >
                     <span className="flex items-center gap-1.5">
@@ -116,7 +154,12 @@ export function FeedFilters({ value, onChange }: { value: Filters; onChange: (f:
                 max={PRICE_MAX}
                 step={PRICE_STEP}
                 value={draft.maxPrice ?? PRICE_MAX}
-                onChange={(e) => setDraft({ ...draft, maxPrice: Number(e.target.value) >= PRICE_MAX ? null : Number(e.target.value) })}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    maxPrice: Number(e.target.value) >= PRICE_MAX ? null : Number(e.target.value),
+                  })
+                }
                 className="accent-[#6e4a35]"
               />
             </div>
@@ -129,25 +172,25 @@ export function FeedFilters({ value, onChange }: { value: Filters; onChange: (f:
                 New this week
               </Chip>
             </div>
-
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => setDraft(NO_FILTERS)}>
-                Reset
-              </Button>
-              <Button
-                size="lg"
-                className="flex-1"
-                onClick={() => {
-                  onChange(draft);
-                  setOpen(false);
-                }}
-              >
-                Show results
-              </Button>
-            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+
+          <div className="flex items-center gap-3 border-t p-6">
+            <Button variant="ghost" onClick={() => setDraft(NO_FILTERS)}>
+              Reset
+            </Button>
+            <Button
+              size="lg"
+              className="flex-1"
+              onClick={() => {
+                onChange(draft);
+                setOpen(false);
+              }}
+            >
+              Show results
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

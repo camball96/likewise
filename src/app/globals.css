@@ -86,3 +86,14 @@ body {
 @utility eyebrow {
   @apply text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase;
 }
+
+/* gentle swing for the hanger shown while inspiration links are analysed */
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-8deg);
+  }
+  50% {
+    transform: rotate(8deg);
+  }
+}
