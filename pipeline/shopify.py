@@ -56,23 +56,26 @@ EXCLUDE = re.compile(
     r"jewel(?:le)?ry|anklet|hair|scrunchie|claw clip|headband|hats?|caps?|beanie|scarf|sunglasses|socks?|"
     r"shoes?|heels?|boots?|sandals?|flats|sneakers?|slides|mules|loafers|thongs|footwear|"
     r"beauty|fragrance|perfume|candle|homewares?|towel|mug|book|sticker|keyring|phone case|"
-    r"bras?|briefs?|undies|underwear|knickers|thong brief|g-string|lingerie|"
-    r"activewear|leggings|sports bra|bike shorts|maternity|kids?|girls|baby|"
+    r"(?<!sports )(?<!sport )bras?|bralettes?|briefs?|undies|underwear|knickers|thong brief|g-string|lingerie|"
+    r"maternity|kids?|girls|baby|"
     r"shipping protection|route|insurance|sample|gift wrap|gift box|warranty|donation)\b",
     re.I,
 )
+# homewares some fashion stores also sell; always dropped, even if the title sounds like clothing ("Pillowcase Set")
+HOMEWARES = re.compile(r"\b(pillow\w*|bedding|sheet sets?|napkins?|placemats?|tea towels?|stationery|kitchen|table linen|cosmetic bags?)\b", re.I)
 MENS = re.compile(r"(^|[^a-z])(mens|men's|men|male|him)([^a-z]|$)", re.I)
 
 CATEGORY_RULES: list[tuple[str, re.Pattern]] = [
     ("Dresses",     re.compile(r"\b(dress(es)?|gown|slip dress|maxi dress|midi dress|mini dress)\b", re.I)),
+    ("Activewear",  re.compile(r"\b(activewear|active|sports? bras?|leggings?|tights|bike shorts?|biker shorts?|yoga|gym|pilates|workout|training|running|tennis)\b", re.I)),
     ("Sleepwear",   re.compile(r"\b(pj|pjs|pyjamas?|pajamas?|sleep\w*|lounge\w*|robe|nightie|nightdress)s?\b", re.I)),
     ("Jumpsuits",   re.compile(r"\b(jumpsuit|playsuit|romper|unitard)s?\b", re.I)),
     ("Sets",        re.compile(r"\b(set|co-?ord|two piece|2 piece|matching)s?\b", re.I)),
     ("Skirts",      re.compile(r"\b(skirt|skort)s?\b", re.I)),
-    ("Shorts",      re.compile(r"\bshorts\b", re.I)),
-    ("Pants",       re.compile(r"\b(pants?|jeans?|trousers?|denim|flares?|culottes?|cargos?|joggers?|trackpants?)\b", re.I)),
-    ("Swim",        re.compile(r"\b(swim\w*|bikini|one piece|sarong|kaftan|cover up)s?\b", re.I)),
     ("Outerwear",   re.compile(r"\b(jacket|coat|blazer|trench|bomber|puffer|gilet|vest|outerwear|shacket)s?\b", re.I)),
+    ("Shorts",      re.compile(r"\bshorts?\b(?!\s*sleeve)|\bjorts\b", re.I)),
+    ("Pants",       re.compile(r"\b(pants?|jeans?|trousers?|flares?|culottes?|cargos?|joggers?|trackpants?)\b", re.I)),
+    ("Swim",        re.compile(r"\b(swim\w*|bikini|one piece|sarong|kaftan|cover up)s?\b", re.I)),
     ("Knitwear",    re.compile(r"\b(knit\w*|cardigan|cardi|jumper|sweater|pullover|hoodie|sweat\w*)s?\b", re.I)),
     ("Tops",        re.compile(r"\b(tops?|tee|t-shirt|tshirt|shirt|blouse|cami|camisole|bodysuit|corset|bustier|tank|singlet|crop|tube|halter|polo|bodice|vest top|long ?sleeve)s?\b", re.I)),
 ]
@@ -91,6 +94,8 @@ def classify(title: str, product_type: str, tags: list[str]) -> str | None:
 
 
 def is_excluded(title: str, product_type: str, tags: list[str]) -> bool:
+    if HOMEWARES.search(title or "") or HOMEWARES.search(product_type or ""):
+        return True
     if EXCLUDE.search(product_type or "") or EXCLUDE.search(title or ""):
         # but don't drop e.g. "Bow Tie Dress" style titles that are clearly clothing
         if not (classify(title, "", []) and not EXCLUDE.search(product_type or "")):
@@ -162,7 +167,7 @@ def normalise(store: dict, p: dict) -> dict | None:
         "img2": p["images"][1]["src"] if len(p["images"]) > 1 else None,
         "price": round(price, 2),
         "compare": round(compare, 2),
-        "cat": classify(title, ptype, tags),
+        "cat": store.get("category") or classify(title, ptype, tags),  # single-category stores (activewear, sleepwear) set this in stores.json
         "sizes": sizes,
         "published": pub_ts,
     }

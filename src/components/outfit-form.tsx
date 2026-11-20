@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useTRPC } from "@/lib/trpc";
 
 // must match the categories the ingest pipeline assigns (pipeline/shopify.py)
-const CATEGORIES = ["Tops", "Dresses", "Skirts", "Shorts", "Pants", "Sets", "Knitwear", "Outerwear", "Jumpsuits", "Swim", "Sleepwear"];
+const CATEGORIES = ["Tops", "Dresses", "Skirts", "Shorts", "Pants", "Sets", "Knitwear", "Outerwear", "Jumpsuits", "Swim", "Activewear", "Sleepwear"];
 
 type Outfit = { id: string; name: string; categories: string[]; stores: { id: string }[] };
 
