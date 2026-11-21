@@ -74,7 +74,10 @@ export const appRouter = router({
           return ctx.db.outfit.create({ data: { ...data, userId: ctx.user.id, stores: { connect: stores } } });
         }
         const before = await ownOutfit(ctx, input.id);
-        if (before.name !== input.name) await ctx.db.$executeRaw`UPDATE "Outfit" SET "nameEmbedding" = NULL WHERE id = ${input.id}`;
+        // the name's weight depends on the name and the categories: the feed works it out again
+        if (before.name !== input.name || before.categories.join() !== input.categories.join()) {
+          await ctx.db.$executeRaw`UPDATE "Outfit" SET "nameEmbedding" = NULL, "nameWeight" = NULL WHERE id = ${input.id}`;
+        }
         return ctx.db.outfit.update({ where: { id: input.id }, data: { ...data, stores: { set: stores } } });
       }),
 
@@ -243,7 +246,7 @@ export const appRouter = router({
     .query(async ({ ctx, input }) => {
       const outfit = await ownOutfit(ctx, input.outfitId);
       const storeIds = outfit.stores.map((s) => s.id);
-      await fingerprintName(ctx, outfit.id, outfit.name);
+      await weighName(ctx, outfit);
       return ctx.db.$queryRaw<FeedProduct[]>`
         WITH pos AS (
           SELECT p.embedding FROM "OutfitItem" i JOIN "Product" p ON p.id = i."productId"
@@ -373,27 +376,36 @@ async function fingerprintReference(ctx: Ctx, id: string, imageUrl: string) {
   }
 }
 
-// The text fingerprint of an outfit's name ("Floral tops"), made once and reused for the same words.
-// Without the Modal service the feed just ranks by inspiration and hearts, as before.
-async function fingerprintName(ctx: Ctx, id: string, name: string) {
-  const [row] = await ctx.db.$queryRaw<{ ready: boolean }[]>`SELECT "nameEmbedding" IS NOT NULL AS ready FROM "Outfit" WHERE id = ${id}`;
-  if (row?.ready) return;
-  const reused = await ctx.db.$executeRaw`
-    UPDATE "Outfit" SET "nameEmbedding" = (
-      SELECT "nameEmbedding" FROM "Outfit" WHERE lower(name) = lower(${name}) AND "nameEmbedding" IS NOT NULL LIMIT 1
-    )
-    WHERE id = ${id} AND EXISTS (SELECT 1 FROM "Outfit" WHERE lower(name) = lower(${name}) AND "nameEmbedding" IS NOT NULL)`;
-  if (reused || !process.env.MODAL_EMBED_URL) return;
+// How much the outfit name ("Floral tops") counts in the feed, from 0 to 1 of one inspiration piece.
+// It's judged by how closely its 12 best matches in the chosen categories fit it: words that don't describe
+// clothing ("test", "Sarah") match nothing well and drop to 0, leaving results to the inspiration, hearts and
+// category pills. Worked out once, then again after a rename or category change. Without Modal it stays out.
+const NAME_FIT = { none: 0.035, full: 0.07 }; // average similarity of those 12; tested on real names vs nonsense
+
+async function weighName(ctx: Ctx, outfit: { id: string; name: string; categories: string[] }) {
+  const [row] = await ctx.db.$queryRaw<{ weighed: boolean }[]>`SELECT "nameWeight" IS NOT NULL AS weighed FROM "Outfit" WHERE id = ${outfit.id}`;
+  if (row?.weighed || !process.env.MODAL_EMBED_URL) return;
   try {
-    const { embedding } = await callFingerprintService({ text: name });
-    await ctx.db.$executeRaw`UPDATE "Outfit" SET "nameEmbedding" = ${`[${embedding.join(",")}]`}::vector WHERE id = ${id}`;
+    const { embedding } = await callFingerprintService({ text: outfit.name }, 20_000);
+    const vec = `[${embedding.join(",")}]`;
+    const [{ fit }] = await ctx.db.$queryRaw<{ fit: number | null }[]>`
+      SELECT avg(1 - d)::float8 AS fit FROM (
+        SELECT p.embedding <=> ${vec}::vector AS d FROM "Product" p JOIN "Store" s ON s.id = p."storeId"
+        WHERE p."inStock" AND s.active AND p.embedding IS NOT NULL
+          AND (cardinality(${outfit.categories}::text[]) = 0 OR p.category = ANY(${outfit.categories}::text[]))
+        ORDER BY d LIMIT 12
+      ) best`;
+    const weight = Math.min(1, Math.max(0, ((fit ?? 0) - NAME_FIT.none) / (NAME_FIT.full - NAME_FIT.none)));
+    // stored pre-scaled, so the feed's average counts it as `weight` of one piece
+    const scaled = weight > 0 ? `[${embedding.map((x) => x * weight).join(",")}]` : null;
+    await ctx.db.$executeRaw`UPDATE "Outfit" SET "nameEmbedding" = ${scaled}::vector, "nameWeight" = ${weight} WHERE id = ${outfit.id}`;
   } catch (e) {
-    console.error(e);
+    console.error(e); // tried again on the next feed load
   }
 }
 
 // pipeline/modal_app.py: send { url } for a photo or { text } for words, get a fingerprint back
-async function callFingerprintService(body: { url: string } | { text: string }) {
+async function callFingerprintService(body: { url: string } | { text: string }, timeoutMs = 90_000) {
   const url = process.env.MODAL_EMBED_URL;
   if (!url) throw new Error("MODAL_EMBED_URL not set");
   const res = await fetch(url, {
@@ -404,7 +416,7 @@ async function callFingerprintService(body: { url: string } | { text: string }) 
       "Modal-Secret": process.env.MODAL_SECRET ?? "",
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(90_000), // allows for a cold start
+    signal: AbortSignal.timeout(timeoutMs), // the default allows for a cold start
   });
   if (!res.ok) throw new Error(`fingerprint service: ${res.status}`);
   return (await res.json()) as { embedding: number[]; selfie?: boolean };
