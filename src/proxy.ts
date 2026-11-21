@@ -7,4 +7,4 @@ export function proxy(request: NextRequest) {
   if (!getSessionCookie(request)) return NextResponse.redirect(new URL("/sign-in", request.url));
 }
 
-export const config = { matcher: ["/", "/outfits/:path*"] };
+export const config = { matcher: ["/welcome", "/outfits/:path*"] };

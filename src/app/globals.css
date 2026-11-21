@@ -87,6 +87,43 @@ body {
   @apply text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase;
 }
 
+/* landing page and doodle animations (used with motion-safe: so reduced-motion users get a still page) */
+@keyframes float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -10px;
+  }
+}
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+    scale: 0.8;
+  }
+  50% {
+    opacity: 1;
+    scale: 1.1;
+  }
+}
+@keyframes pop {
+  0%,
+  70%,
+  100% {
+    scale: 1;
+  }
+  80% {
+    scale: 1.25;
+  }
+}
+@keyframes marquee {
+  to {
+    translate: -50% 0;
+  }
+}
+
 /* gentle swing for the hanger shown while inspiration links are analysed */
 @keyframes sway {
   0%,
