@@ -60,7 +60,7 @@ export default function OutfitPage() {
             <PlusIcon />
           </Button>
         </nav>
-        <Button variant="ghost" size="sm" onClick={() => authClient.signOut().then(() => router.replace("/sign-in"))}>
+        <Button variant="ghost" size="sm" onClick={() => authClient.signOut().then(() => router.replace("/"))}>
           Sign out
         </Button>
       </header>

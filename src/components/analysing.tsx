@@ -2,6 +2,7 @@
 
 import { ClockIcon, Loader2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Hanger } from "@/components/doodles";
 
 // Links are usually fingerprinted within this long of being added (longer if the service was asleep).
 const TYPICAL_MS = 60_000;
@@ -25,7 +26,7 @@ export function Analysing({ references }: { references: Pending[] }) {
     <div className="panel mb-6 grid gap-5">
       <div className="flex items-center gap-5">
         <div className="grid size-20 shrink-0 place-items-center rounded-full bg-secondary">
-          <Hanger />
+          <Hanger className="h-14" />
         </div>
         <div className="min-w-0">
           <p className="eyebrow">Tailoring your feed</p>
@@ -53,26 +54,5 @@ export function Analysing({ references }: { references: Pending[] }) {
         ))}
       </div>
     </div>
-  );
-}
-
-// A dress on a hanger, swinging gently.
-function Hanger() {
-  return (
-    <svg
-      viewBox="0 0 48 64"
-      className="h-14 origin-top animate-[sway_2.4s_ease-in-out_infinite] text-[#6e4a35]"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 7a3 3 0 1 1 3 3v4" />
-      <path d="M24 14 6 25h36z" />
-      <path d="M18 25v5M30 25v5" />
-      <path d="M15 30q9 4 18 0l-2 10 8 19q-15 4-30 0l8-19z" fill="#ecdcc8" />
-      <path d="M17 40h14" />
-    </svg>
   );
 }

@@ -1,16 +1,26 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Steps } from "@/components/steps";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
 
-export default function SignInPage() {
+export default function Page() {
+  return (
+    <Suspense>
+      <SignInPage />
+    </Suspense>
+  );
+}
+
+function SignInPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
+  // /sign-in?mode=sign-up (the landing page's buttons) opens on "Create your account"
+  const [mode, setMode] = useState<"sign-in" | "sign-up">(useSearchParams().get("mode") === "sign-up" ? "sign-up" : "sign-in");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -34,9 +44,9 @@ export default function SignInPage() {
     <main className="grid min-h-screen place-items-center px-6 py-16">
       <div className="grid w-full max-w-5xl items-center gap-12 md:grid-cols-2">
         <section className="mx-auto max-w-md">
-          <p className="font-heading text-3xl font-semibold">
+          <Link href="/" className="font-heading text-3xl font-semibold">
             like<em className="text-[#6e4a35]">wise</em>
-          </p>
+          </Link>
           <p className="eyebrow mt-10">Australian fashion, chosen for you</p>
           <h1 className="mt-3 font-heading text-5xl leading-[1.05] font-semibold sm:text-6xl">
             Clothes you&apos;ll <em className="text-[#6e4a35]">actually</em> love
