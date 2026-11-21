@@ -99,6 +99,9 @@ export default function OutfitPage() {
               categories={outfit.categories}
               storeCount={outfit.stores.length}
               onEdit={() => setDialog("edit")}
+              // the search's meaning is still being worked out (first visit, rename or category change)
+              weighing={outfit.nameWeight === null && !references.some((r) => r.status === "PENDING") ? outfit.name : undefined}
+              onWeighed={() => outfits.refetch()}
             />
           </TabsContent>
           <TabsContent value="saved" className="mt-6">
@@ -146,6 +149,8 @@ function Feed({
   categories,
   storeCount,
   onEdit,
+  weighing,
+  onWeighed,
 }: {
   outfitId: string;
   filters: Filters;
@@ -153,6 +158,8 @@ function Feed({
   categories: string[];
   storeCount: number;
   onEdit: () => void;
+  weighing?: string;
+  onWeighed: () => void;
 }) {
   const client = useTRPCClient(); // feed pages aren't cached: each one depends on what's already been shown
   const setItem = useSetItem(outfitId);
@@ -170,10 +177,11 @@ function Feed({
       shown.current.push(...page.map((p) => p.id));
       setProducts((prev) => [...prev, ...page]);
       if (page.length < FEED_PAGE) setDone(true);
+      if (weighing) onWeighed();
     } finally {
       setLoading(false);
     }
-  }, [client, filters, outfitId]);
+  }, [client, filters, outfitId, weighing, onWeighed]);
 
   // first page (once, even when React runs effects twice in development)
   useEffect(() => {
@@ -200,6 +208,7 @@ function Feed({
 
   return (
     <>
+      {weighing && loading && products.length === 0 && <Analysing references={[]} name={weighing} />}
       <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
         {products.map((p) => (
           <ProductCard
@@ -220,7 +229,7 @@ function Feed({
               {loading && <Loader2Icon className="animate-spin" />} {loading ? "Loading…" : "Load more"}
             </Button>
           ) : (
-            <Loader2Icon className="mx-auto size-6 animate-spin text-muted-foreground" />
+            !weighing && <Loader2Icon className="mx-auto size-6 animate-spin text-muted-foreground" />
           )}
         </div>
       )}

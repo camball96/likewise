@@ -71,15 +71,24 @@ export const appRouter = router({
         const stores = input.storeIds.map((id) => ({ id }));
         const data = { name: input.name, categories: input.categories };
         if (!input.id) {
-          return ctx.db.outfit.create({ data: { ...data, userId: ctx.user.id, stores: { connect: stores } } });
+          const outfit = await ctx.db.outfit.create({ data: { ...data, userId: ctx.user.id, stores: { connect: stores } } });
+          void weighName(ctx, outfit); // started now so it's usually done by the time the feed loads
+          return outfit;
         }
         const before = await ownOutfit(ctx, input.id);
         // the name's weight depends on the name and the categories: the feed works it out again
         if (before.name !== input.name || before.categories.join() !== input.categories.join()) {
           await ctx.db.$executeRaw`UPDATE "Outfit" SET "nameEmbedding" = NULL, "nameWeight" = NULL WHERE id = ${input.id}`;
         }
-        return ctx.db.outfit.update({ where: { id: input.id }, data: { ...data, stores: { set: stores } } });
+        const outfit = await ctx.db.outfit.update({ where: { id: input.id }, data: { ...data, stores: { set: stores } } });
+        void weighName(ctx, outfit);
+        return outfit;
       }),
+
+    // Wakes the fingerprint service when the form opens, so it's ready (not asleep) by the time the user saves.
+    warm: protectedProcedure.mutation(() => {
+      if (process.env.MODAL_EMBED_URL) void callFingerprintService({ text: "dress" }).catch(() => {});
+    }),
 
     delete: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
       await ownOutfit(ctx, input.id);
