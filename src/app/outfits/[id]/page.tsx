@@ -8,13 +8,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Analysing } from "@/components/analysing";
 import { SavedLists } from "@/components/lists";
 import { FeedFilters, filterCount, NO_FILTERS, type Filters } from "@/components/feed-filters";
+import { InspirationStrip } from "@/components/inspiration-strip";
 import { OutfitForm } from "@/components/outfit-form";
+import { PhotoButton } from "@/components/photo-button";
 import { ProductCard, type CardProduct } from "@/components/product-card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authClient } from "@/lib/auth-client";
+import { toJpegBase64 } from "@/lib/photo";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 
 export default function OutfitPage() {
@@ -78,7 +81,12 @@ export default function OutfitPage() {
             </TabsList>
           </div>
           <TabsContent value="feed" className="mt-6">
-            <FeedFilters key={id} value={filters} onChange={setFilters} />
+            {saved.data && <InspirationStrip references={references} items={saved.data.items} onEdit={() => setDialog("edit")} />}
+            {/* feed toolbar, set apart from the outfit's header by a hairline */}
+            <div className="mb-5 flex items-start justify-between gap-3 border-t border-foreground/10 pt-5">
+              <FeedFilters key={id} value={filters} onChange={setFilters} />
+              <p className="hidden shrink-0 pt-1.5 text-xs text-muted-foreground sm:block">Closest matches first</p>
+            </div>
             <Analysing references={references.filter((r) => r.status === "PENDING")} />
             <Feed
               key={`${outfit.id}-${ready}-${JSON.stringify(filters)}`}
@@ -256,6 +264,17 @@ function Saved({ outfitId }: { outfitId: string }) {
     }),
   );
 
+  const uploadExample = useMutation(trpc.items.uploadExample.mutationOptions({ onSuccess: refresh }));
+  const [uploading, setUploading] = useState(false);
+  const [uploadFailed, setUploadFailed] = useState(false);
+  async function upload(files: File[]) {
+    setUploading(true);
+    setUploadFailed(false);
+    const results = await Promise.allSettled(files.map(async (file) => uploadExample.mutateAsync({ outfitId, jpeg: await toJpegBase64(file) })));
+    setUploadFailed(results.some((r) => r.status === "rejected"));
+    setUploading(false);
+  }
+
   const items = saved.data?.items ?? [];
   const examples = items.filter((i) => i.kind === "EXAMPLE");
   const likes = items.filter((i) => i.kind === "LIKE");
@@ -269,25 +288,30 @@ function Saved({ outfitId }: { outfitId: string }) {
         <p className="eyebrow">Your taste</p>
         <h2 className="mt-1 font-heading text-3xl font-semibold">Style references</h2>
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          Paste a link to anything you love: a product page from any store, a Pinterest pin, an Instagram post. Everything you add here shapes what we pick for you.
+          Paste a link to anything you love (a product page from any store, a Pinterest pin, an Instagram post) or upload a photo. Everything you add
+          here shapes what we pick for you.
         </p>
         <form
-          className="flex max-w-xl gap-2"
+          className="flex max-w-2xl flex-wrap gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             addExample.mutate({ outfitId, url });
           }}
         >
-          <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" type="url" required />
+          <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" type="url" required className="min-w-48 flex-1" />
           <Button type="submit" disabled={addExample.isPending}>
             {addExample.isPending ? "Adding…" : "Add"}
           </Button>
+          <PhotoButton onPick={upload} disabled={uploading}>
+            {uploading ? "Uploading…" : "Upload photo"}
+          </PhotoButton>
         </form>
         {addExample.error && <p className="mt-2 text-sm text-destructive">{addExample.error.message}</p>}
+        {uploadFailed && <p className="mt-2 text-sm text-destructive">Couldn&apos;t upload that photo. Try a JPG, PNG or WebP.</p>}
         <Grid>
           {saved.data?.references.map((r) => (
             <article key={r.id} className="min-w-0">
-              <a href={r.sourceUrl} target="_blank" rel="noopener" className="relative block aspect-[3/4] overflow-hidden rounded-2xl bg-secondary">
+              <a href={r.sourceUrl ?? r.imageUrl} target="_blank" rel="noopener" className="relative block aspect-[3/4] overflow-hidden rounded-2xl bg-secondary">
                 <img src={r.imageUrl} alt="" className="size-full object-cover" />
                 {r.status !== "READY" && (
                   <span className="absolute inset-x-2 top-2 flex items-center justify-center gap-1.5 rounded-full bg-card/90 px-2 py-1 text-xs">
@@ -297,7 +321,7 @@ function Saved({ outfitId }: { outfitId: string }) {
                 )}
               </a>
               <div className="flex items-center justify-between pt-2 text-sm">
-                <span className="truncate text-muted-foreground">{new URL(r.sourceUrl).hostname.replace(/^www\./, "")}</span>
+                <span className="truncate text-muted-foreground">{r.sourceUrl ? new URL(r.sourceUrl).hostname.replace(/^www\./, "") : "Your photo"}</span>
                 <button className="text-xs underline" onClick={() => removeReference.mutate({ id: r.id })}>
                   Remove
                 </button>

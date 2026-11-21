@@ -89,7 +89,7 @@ model Reference {
   id        String                      @id @default(uuid())
   outfitId  String
   outfit    Outfit                      @relation(fields: [outfitId], references: [id], onDelete: Cascade)
-  sourceUrl String
+  sourceUrl String? // the pasted link; empty for uploaded photos
   imageUrl  String
   status    ReferenceStatus             @default(PENDING)
   embedding Unsupported("vector(768)")?
