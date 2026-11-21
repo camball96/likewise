@@ -3,8 +3,8 @@
 import { ClockIcon, Loader2Icon } from "lucide-react";
 import { useEffect, useState } from "react";
 
-// A fingerprinting run (GitHub Action) usually finishes within this long of a link being added.
-const TYPICAL_MS = 4 * 60_000;
+// Links are usually fingerprinted within this long of being added (longer if the service was asleep).
+const TYPICAL_MS = 60_000;
 
 type Pending = { id: string; imageUrl: string; createdAt: Date | string };
 
@@ -33,7 +33,7 @@ export function Analysing({ references }: { references: Pending[] }) {
             Learning your style from {n} new {n === 1 ? "link" : "links"}
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            We&apos;re studying each photo to learn exactly what you&apos;re drawn to. This usually takes 2 to 4 minutes, and your feed will
+            We&apos;re studying each photo to learn exactly what you&apos;re drawn to. This usually takes under a minute, and your feed will
             refresh by itself when it&apos;s done. Keep browsing in the meantime.
           </p>
           <p className="mt-2 flex items-center gap-1.5 text-sm font-medium">

@@ -20,7 +20,7 @@ src/proxy.ts               sends signed-out visitors to /sign-in
 
 The feed is one SQL query in `src/server/router.ts`: it averages the fingerprints of the outfit's style references and hearts (hearts count double) and returns the nearest in-stock products from the outfit's stores, skipping anything already shown or reacted to. With no references yet it shows the newest products.
 
-**Style references from any link.** A link to one of our stores' products is added instantly. Any other link (another store, Pinterest, Instagram) is saved with the page's main image (`og:image`) as a pending `Reference`; the app then starts the ingest workflow with `references_only`, which fingerprints it within a couple of minutes. Instagram often hides images from servers, in which case the user sees an error and can try another link.
+**Style references from any link.** A link to one of our stores' products is added instantly. Any other link (another store, Pinterest, Instagram) is saved with the page's main image (`og:image`) as a pending `Reference`, and the app sends the photo to the fingerprint service on Modal (`pipeline/modal_app.py`), which usually returns within seconds. If that service isn't configured or fails, the app starts the ingest workflow with `references_only` instead, which takes a few minutes. Instagram often hides images from servers, in which case the user sees an error and can try another link.
 
 ## Run locally
 
@@ -68,3 +68,14 @@ Schema changes: edit `prisma/schema.prisma`, then `npx prisma migrate dev --name
 4. `GITHUB_DISPATCH_TOKEN`: a fine-grained personal access token limited to this repo with **Actions: Read and write**.
 
 **Google sign-in:** in Google Cloud Console, create an OAuth client (Web application) with redirect URI `<BETTER_AUTH_URL>/api/auth/callback/google` (and `http://localhost:3000/api/auth/callback/google` for local dev).
+
+## Fingerprint service (Modal)
+
+`pipeline/modal_app.py` runs the same model as the ingest job behind a small web endpoint on [Modal](https://modal.com), so pasted links are fingerprinted in seconds. It shuts down 15 seconds after the last request (Modal bills every second a container is up) and starts again from a memory snapshot in a few seconds. A photo that was pasted before reuses its fingerprint without calling Modal.
+
+1. `pip install modal` (in the pipeline's virtualenv) and `modal setup` to sign in.
+2. From the repo root: `modal deploy pipeline/modal_app.py`. It prints the endpoint URL (ending in `-image.modal.run`).
+3. Modal dashboard → Settings → **Proxy Auth Tokens** → create one. The endpoint rejects requests without it.
+4. On Render (and in `.env` for local dev), set `MODAL_EMBED_URL` to the URL, and `MODAL_KEY` / `MODAL_SECRET` to the token's ID and secret.
+
+After that, `.github/workflows/modal.yml` redeploys automatically whenever `pipeline/embed.py` or `pipeline/modal_app.py` changes on `production` (or run it by hand from the Actions tab). It needs two repository secrets, `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET`: create an API token in Modal → Settings → API Tokens.
