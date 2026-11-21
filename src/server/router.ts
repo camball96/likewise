@@ -23,7 +23,7 @@ export const appRouter = router({
   contact: publicProcedure
     .input(
       z.object({
-        kind: z.enum(["GENERAL", "FEATURE"]),
+        kind: z.enum(["GENERAL", "FEATURE", "STORE"]),
         name: z.string().trim().min(1).max(100),
         email: z.email().max(200),
         message: z.string().trim().min(1).max(5000),
@@ -37,7 +37,7 @@ export const appRouter = router({
       }
       const { kind, name, email, message } = input;
       await ctx.db.contactMessage.create({ data: { kind, name, email, message, userId: ctx.user?.id } });
-      const label = input.kind === "FEATURE" ? "Feature request" : "General enquiry";
+      const label = { GENERAL: "General enquiry", FEATURE: "Feature request", STORE: "Store enquiry" }[input.kind];
       await sendEmail({
         subject: `${label} from ${input.name}`,
         text: `${label}\nFrom: ${input.name} <${input.email}>\n\n${input.message}`,
@@ -315,7 +315,7 @@ async function findImage(url: string): Promise<string | null> {
   }
   try {
     const res = await fetch(url, {
-      headers: { "user-agent": "Mozilla/5.0 (compatible; likewise/1.0)", accept: "text/html,image/*" },
+      headers: { "user-agent": "Mozilla/5.0 (compatible; likewise/1.0; +https://lkws.au/for-stores)", accept: "text/html,image/*" },
       signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) return null;

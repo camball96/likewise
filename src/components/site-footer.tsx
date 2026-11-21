@@ -10,8 +10,14 @@ export function SiteFooter() {
       <Link href="/privacy" className="hover:text-foreground">
         Privacy
       </Link>
+      <Link href="/terms" className="hover:text-foreground">
+        Terms
+      </Link>
       <Link href="/contact" className="hover:text-foreground">
         Contact
+      </Link>
+      <Link href="/for-stores" className="hover:text-foreground">
+        For stores
       </Link>
     </footer>
   );

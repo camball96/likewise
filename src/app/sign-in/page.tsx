@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { Steps } from "@/components/steps";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
@@ -22,6 +23,8 @@ function SignInPage() {
   // /sign-in?mode=sign-up (the landing page's buttons) opens on "Create your account"
   const [mode, setMode] = useState<"sign-in" | "sign-up">(useSearchParams().get("mode") === "sign-up" ? "sign-up" : "sign-in");
   const [error, setError] = useState("");
+  const [agreed, setAgreed] = useState(false); // terms + privacy, required to create an account
+  const blocked = mode === "sign-up" && !agreed;
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -60,9 +63,40 @@ function SignInPage() {
         <div className="panel mx-auto grid grid-cols-1 w-full max-w-md gap-5">
           <h2 className="font-heading text-3xl font-semibold">{mode === "sign-in" ? "Welcome back" : "Create your account"}</h2>
 
-          <Button variant="outline" size="lg" onClick={() => authClient.signIn.social({ provider: "google", callbackURL: "/" })}>
+          {mode === "sign-up" && (
+            <label className="flex items-start gap-3 rounded-xl bg-secondary/50 p-3 text-sm">
+              <Checkbox checked={agreed} onCheckedChange={setAgreed} className="mt-0.5" />
+              <span>
+                I agree to the{" "}
+                <Link href="/terms" target="_blank" className="underline">
+                  Terms of Use
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy" target="_blank" className="underline">
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
+          )}
+
+          <Button variant="outline" size="lg" disabled={blocked} onClick={() => authClient.signIn.social({ provider: "google", callbackURL: "/" })}>
             Continue with Google
           </Button>
+          {/* Google can create an account from here too, for someone new */}
+          {mode === "sign-in" && (
+            <p className="-mt-3 text-center text-xs text-muted-foreground">
+              New to likewise? Continuing with Google means you agree to our{" "}
+              <Link href="/terms" className="underline">
+                Terms
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="underline">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          )}
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
@@ -84,7 +118,7 @@ function SignInPage() {
               <Input id="password" name="password" type="password" minLength={8} required />
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" size="lg" disabled={busy}>
+            <Button type="submit" size="lg" disabled={busy || blocked}>
               {mode === "sign-in" ? "Sign in" : "Create account"}
             </Button>
           </form>

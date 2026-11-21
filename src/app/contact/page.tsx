@@ -14,6 +14,7 @@ import { useTRPC } from "@/lib/trpc";
 const KINDS = [
   { value: "GENERAL", label: "General enquiry", prompt: "How can we help?" },
   { value: "FEATURE", label: "Feature request", prompt: "What would make likewise better for you?" },
+  { value: "STORE", label: "Store or brand", prompt: "Your store's name and website, and what you'd like (removal, a correction, or to partner with us)" },
 ] as const;
 
 export default function ContactPage() {
@@ -44,8 +45,9 @@ function ContactForm() {
   const trpc = useTRPC();
   const send = useMutation(trpc.contact.mutationOptions());
   const session = authClient.useSession().data;
-  // /contact?type=feature opens on a feature request
-  const [kind, setKind] = useState<"GENERAL" | "FEATURE">(useSearchParams().get("type") === "feature" ? "FEATURE" : "GENERAL");
+  // /contact?type=feature or ?type=store opens on that kind of message
+  const type = useSearchParams().get("type");
+  const [kind, setKind] = useState<(typeof KINDS)[number]["value"]>(type === "feature" ? "FEATURE" : type === "store" ? "STORE" : "GENERAL");
   const current = KINDS.find((k) => k.value === kind)!;
   const [token, setToken] = useState("");
   const [check, setCheck] = useState(0); // bumped to get a fresh spam check after a failed send
