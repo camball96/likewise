@@ -10,6 +10,7 @@ const serif = Cormorant_Garamond({ variable: "--font-serif", subsets: ["latin"],
 export const metadata: Metadata = {
   title: "likewise",
   description: "Australian fashion, picked for your taste.",
+  verification: { other: { "commission-factory-verification": "d3f25358ac22409d863e693d9d8c19bc" } },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
