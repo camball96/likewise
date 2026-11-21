@@ -8,7 +8,9 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-UA = "Mozilla/5.0 (compatible; likewise/1.0; personal outfit finder)"
+# Identifies us to stores, with a page explaining what we do and how to opt out
+UA = "Mozilla/5.0 (compatible; likewise/1.0; +https://lkws.au/for-stores)"
+BOT = "likewise"  # the name stores can address in robots.txt
 PAGE_SIZE = 250
 REQUEST_GAP_S = 1.0  # be polite: at most ~1 request/second per store
 
@@ -32,21 +34,84 @@ def get_json(url: str, retries: int = 3) -> dict:
     raise last  # type: ignore[misc]
 
 
+# ---------------------------------------------------------------- robots.txt
+
+class Disallowed(Exception):
+    """The store's robots.txt doesn't allow us to read its product list."""
+
+
+def robots_rules(domain: str) -> list[tuple[bool, re.Pattern, int]]:
+    """(allow?, pattern, length) rules from the store's robots.txt that apply to us: the group naming
+    "likewise" if there is one, otherwise the "*" group. Supports * and $ wildcards like Google does."""
+    try:
+        req = urllib.request.Request(f"https://{domain}/robots.txt", headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            text = r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            raise Disallowed(f"robots.txt returned {e.code}")
+        return []  # no robots.txt: everything allowed
+    groups: dict[str, list[tuple[bool, str]]] = {}
+    agents: list[str] = []
+    in_rules = False
+    for line in text.splitlines():
+        line = line.split("#", 1)[0].strip()
+        if ":" not in line:
+            continue
+        key, value = (x.strip() for x in line.split(":", 1))
+        key = key.lower()
+        if key == "user-agent":
+            if in_rules:
+                agents, in_rules = [], False
+            agents.append(value.lower())
+        elif key in ("allow", "disallow"):
+            in_rules = True
+            for agent in agents:
+                if value:  # an empty Disallow means "allow everything"
+                    groups.setdefault(agent, []).append((key == "allow", value))
+                else:
+                    groups.setdefault(agent, [])
+    ours = next((rules for agent, rules in groups.items() if BOT in agent), groups.get("*", []))
+    compiled = []
+    for allow, path in ours:
+        rx = re.escape(path).replace(r"\*", ".*")
+        rx = rx[:-2] + "$" if rx.endswith(r"\$") else rx
+        compiled.append((allow, re.compile(rx), len(path)))
+    return compiled
+
+
+def allowed(rules: list[tuple[bool, re.Pattern, int]], path: str) -> bool:
+    """Most specific (longest) matching rule wins; Allow wins a tie."""
+    matches = [(length, allow) for allow, rx, length in rules if rx.match(path)]
+    return not matches or max(matches)[1]
+
+
 def fetch_store(domain: str, max_products: int) -> list[dict]:
-    """Newest-first products (Shopify returns products.json ordered by publish date)."""
+    """Newest-first products (Shopify returns products.json ordered by publish date), following the store's
+    robots.txt: some stores disallow the ?limit= parameter, so we fall back to Shopify's default page size."""
+    rules = robots_rules(domain)
+    page_size = next((size for size in (PAGE_SIZE, 30) if allowed(rules, product_list_path(size, 1))), None)
+    if page_size is None:
+        raise Disallowed("robots.txt disallows /products.json")
     out: list[dict] = []
     page = 1
     while len(out) < max_products:
-        data = get_json(f"https://{domain}/products.json?limit={PAGE_SIZE}&page={page}")
-        batch = data.get("products", [])
+        path = product_list_path(page_size, page)
+        if not allowed(rules, path):
+            break
+        batch = get_json(f"https://{domain}{path}").get("products", [])
         if not batch:
             break
         out.extend(batch)
-        if len(batch) < PAGE_SIZE:
+        if len(batch) < page_size:
             break
         page += 1
         time.sleep(REQUEST_GAP_S)
     return out[:max_products]
+
+
+def product_list_path(page_size: int, page: int) -> str:
+    return f"/products.json?limit={page_size}&page={page}" if page_size != 30 else f"/products.json?page={page}"
 
 
 # ---------------------------------------------------------------- classification

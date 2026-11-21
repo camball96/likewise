@@ -104,3 +104,9 @@ Each user's uploads are stored under `uploads/<user id>/`. To delete everything 
 **Spam check (Cloudflare Turnstile):** Cloudflare → **Turnstile → Add widget** for `lkws.au` (and `localhost` for testing), then set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. The site key is built into the page, so on Render set it before the deploy builds. Without the keys the check is skipped.
 
 `/privacy` is the privacy policy (`src/app/privacy/page.tsx`); update its date when it changes.
+
+## Stores: crawling etiquette and removals
+
+The ingest identifies itself as `likewise` (user agent links to `/for-stores`), follows each store's robots.txt (`robots_rules` in `pipeline/shopify.py`; if `?limit=` is disallowed it falls back to Shopify's default page size, and a store that disallows `/products.json` is skipped and its products stop showing), and makes at most about one request per second per store.
+
+To remove a store on request (promised within one business day on `/for-stores`): set `"enabled": false` for it in `config/stores.json`, and hide it immediately with `UPDATE "Store" SET active = false WHERE id = '<key>';`. Store enquiries arrive through `/contact?type=store`.

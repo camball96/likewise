@@ -77,6 +77,10 @@ def ingest_products(conn, max_new: int):
         try:
             raw = shopify.fetch_store(store["domain"], store.get("max_products", cap))
             return store, [x for x in (shopify.normalise(store, p) for p in raw) if x], None
+        except shopify.Disallowed as e:
+            # the store's robots.txt says no: treat it as having nothing, so its products stop showing
+            print(f"  {store['name']}: skipped ({e})", flush=True)
+            return store, [], None
         except Exception as e:
             return store, [], e
 

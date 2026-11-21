@@ -124,6 +124,7 @@ model ListItem {
 enum ContactKind {
   GENERAL // general enquiry
   FEATURE // feature request
+  STORE // from a store or brand (opt-outs, corrections, partnerships)
 }
 
 // Sent from the Contact page (also emailed to CONTACT_EMAIL when Resend is set up).
@@ -149,17 +150,18 @@ model Click {
 // ---------- Better Auth (shape required by better-auth) ----------
 
 model User {
-  id            String    @id
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  outfits       Outfit[]
-  lists         List[]
+  id              String    @id
+  name            String
+  email           String    @unique
+  emailVerified   Boolean   @default(false)
+  image           String?
+  termsAcceptedAt DateTime? // when they agreed to the Terms of Use and Privacy Policy (set at sign-up)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  sessions        Session[]
+  accounts        Account[]
+  outfits         Outfit[]
+  lists           List[]
 
   @@map("user")
 }
