@@ -28,7 +28,7 @@ export function Analysing({ references, name }: { references: Pending[]; name?: 
           <p className="eyebrow">Tailoring your feed</p>
           <h3 className="mt-1 font-heading text-2xl font-semibold">Getting to know &ldquo;{name}&rdquo;</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            We&apos;re matching what you&apos;re shopping for against today&apos;s pieces. Your picks will appear here in a few seconds.
+            We&apos;re matching what you&apos;re shopping for against today&apos;s pieces. Your feed will sharpen by itself in a few seconds, so keep browsing in the meantime.
           </p>
           <p className="mt-2 flex items-center gap-1.5 text-sm font-medium">
             <Loader2Icon className="size-4 animate-spin" /> Nearly there…

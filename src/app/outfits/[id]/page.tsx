@@ -24,7 +24,11 @@ export default function OutfitPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const trpc = useTRPC();
-  const outfits = useQuery(trpc.outfits.list.queryOptions());
+  // poll while the search's meaning is being worked out (first visit, rename or category change)
+  const outfits = useQuery({
+    ...trpc.outfits.list.queryOptions(),
+    refetchInterval: (q) => (q.state.data?.find((o) => o.id === id)?.nameWeight === null ? 3000 : false),
+  });
   const outfit = outfits.data?.find((o) => o.id === id);
   const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
   // poll while pasted links are being analysed; the feed restarts when one becomes ready
@@ -90,18 +94,15 @@ export default function OutfitPage() {
               <FeedFilters key={id} value={filters} onChange={setFilters} />
               <p className="hidden shrink-0 pt-1.5 text-xs text-muted-foreground sm:block">Closest matches first</p>
             </div>
-            <Analysing references={references.filter((r) => r.status === "PENDING")} />
+            <Analysing references={references.filter((r) => r.status === "PENDING")} name={outfit.nameWeight === null ? outfit.name : undefined} />
             <Feed
-              key={`${outfit.id}-${ready}-${JSON.stringify(filters)}`}
+              key={`${outfit.id}-${ready}-${outfit.nameWeight === null}-${JSON.stringify(filters)}`}
               outfitId={outfit.id}
               filters={filters}
               onClearFilters={() => setFilters(NO_FILTERS)}
               categories={outfit.categories}
               storeCount={outfit.stores.length}
               onEdit={() => setDialog("edit")}
-              // the search's meaning is still being worked out (first visit, rename or category change)
-              weighing={outfit.nameWeight === null && !references.some((r) => r.status === "PENDING") ? outfit.name : undefined}
-              onWeighed={() => outfits.refetch()}
             />
           </TabsContent>
           <TabsContent value="saved" className="mt-6">
@@ -149,8 +150,6 @@ function Feed({
   categories,
   storeCount,
   onEdit,
-  weighing,
-  onWeighed,
 }: {
   outfitId: string;
   filters: Filters;
@@ -158,8 +157,6 @@ function Feed({
   categories: string[];
   storeCount: number;
   onEdit: () => void;
-  weighing?: string;
-  onWeighed: () => void;
 }) {
   const client = useTRPCClient(); // feed pages aren't cached: each one depends on what's already been shown
   const setItem = useSetItem(outfitId);
@@ -177,11 +174,10 @@ function Feed({
       shown.current.push(...page.map((p) => p.id));
       setProducts((prev) => [...prev, ...page]);
       if (page.length < FEED_PAGE) setDone(true);
-      if (weighing) onWeighed();
     } finally {
       setLoading(false);
     }
-  }, [client, filters, outfitId, weighing, onWeighed]);
+  }, [client, filters, outfitId]);
 
   // first page (once, even when React runs effects twice in development)
   useEffect(() => {
@@ -208,7 +204,6 @@ function Feed({
 
   return (
     <>
-      {weighing && loading && products.length === 0 && <Analysing references={[]} name={weighing} />}
       <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 lg:grid-cols-4">
         {products.map((p) => (
           <ProductCard
@@ -229,7 +224,7 @@ function Feed({
               {loading && <Loader2Icon className="animate-spin" />} {loading ? "Loading…" : "Load more"}
             </Button>
           ) : (
-            !weighing && <Loader2Icon className="mx-auto size-6 animate-spin text-muted-foreground" />
+            <Loader2Icon className="mx-auto size-6 animate-spin text-muted-foreground" />
           )}
         </div>
       )}
