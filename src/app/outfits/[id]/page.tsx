@@ -9,6 +9,7 @@ import { Analysing } from "@/components/analysing";
 import { SavedLists } from "@/components/lists";
 import { FeedFilters, filterCount, NO_FILTERS, type Filters } from "@/components/feed-filters";
 import { InspirationStrip } from "@/components/inspiration-strip";
+import { InstallPrompt } from "@/components/install-prompt";
 import { OutfitForm } from "@/components/outfit-form";
 import { PhotoButton } from "@/components/photo-button";
 import { ProductCard, type CardProduct } from "@/components/product-card";
@@ -30,6 +31,10 @@ export default function OutfitPage() {
     refetchInterval: (q) => (q.state.data?.find((o) => o.id === id)?.nameWeight === null ? 3000 : false),
   });
   const outfit = outfits.data?.find((o) => o.id === id);
+  // deleted (or an old link): go to their first results page instead
+  useEffect(() => {
+    if (outfits.data && !outfit) router.replace("/welcome");
+  }, [outfits.data, outfit, router]);
   const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
   // poll while pasted links are being analysed; the feed restarts when one becomes ready
   const saved = useQuery({
@@ -96,7 +101,9 @@ export default function OutfitPage() {
             </div>
             <Analysing references={references.filter((r) => r.status === "PENDING")} name={outfit.nameWeight === null ? outfit.name : undefined} />
             <Feed
-              key={`${outfit.id}-${ready}-${outfit.nameWeight === null}-${JSON.stringify(filters)}`}
+              // starts again when anything that shapes the results changes: links becoming ready, the name or its weight,
+              // categories, stores, filters
+              key={JSON.stringify([outfit.id, ready, outfit.name, outfit.nameWeight, outfit.categories, outfit.stores, filters])}
               outfitId={outfit.id}
               filters={filters}
               onClearFilters={() => setFilters(NO_FILTERS)}
@@ -110,8 +117,8 @@ export default function OutfitPage() {
           </TabsContent>
         </Tabs>
       )}
-      {outfits.data && !outfit && <p className="mt-10 text-center text-muted-foreground">Results not found.</p>}
 
+      <InstallPrompt />
       <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
         <DialogContent showCloseButton={false} className="max-h-[90vh] overflow-y-auto bg-transparent p-0 ring-0 sm:max-w-md">
           {dialog && (
