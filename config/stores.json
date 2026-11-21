@@ -100,6 +100,7 @@
     { "key": "bimbyandroy",       "name": "Bimby + Roy",         "domain": "bimbyandroy.com.au" },
     { "key": "sandrasilk",        "name": "Sandra Silk",         "domain": "sandrasilk.com.au", "category": "Lingerie" },
     { "key": "lebuns",            "name": "Lé Buns",             "domain": "lebuns.com.au" },
-    { "key": "souszy",            "name": "Souszy",              "domain": "souszy.com.au", "category": "Lingerie" }
+    { "key": "souszy",            "name": "Souszy",              "domain": "souszy.com.au", "category": "Lingerie" },
+    { "key": "billyj",            "name": "Billy J",             "domain": "billyj.com.au" }
   ]
 }
