@@ -10,7 +10,7 @@ export async function sendEmail({ subject, text, html, to, replyTo }: Email) {
       method: "POST",
       headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM ?? "likewise <noreply@lkws.au>",
+        from: process.env.EMAIL_FROM ?? "likewise <hello@lkws.au>", // an address people can reply to: "no-reply" senders land in spam more
         to: to ?? process.env.CONTACT_EMAIL ?? "hello@lkws.au",
         subject,
         text,

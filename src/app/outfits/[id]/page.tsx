@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2Icon, PencilIcon, PlusIcon } from "lucide-react";
+import { Loader2Icon, PencilIcon, PlusIcon, UserRoundIcon } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,11 +13,10 @@ import { InstallPrompt } from "@/components/install-prompt";
 import { OutfitForm } from "@/components/outfit-form";
 import { PhotoButton } from "@/components/photo-button";
 import { ProductCard, type CardProduct } from "@/components/product-card";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { authClient } from "@/lib/auth-client";
 import { fromCamera, toJpegBase64 } from "@/lib/photo";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 
@@ -69,9 +68,9 @@ export default function OutfitPage() {
             <PlusIcon />
           </Button>
         </nav>
-        <Button variant="ghost" size="sm" onClick={() => authClient.signOut().then(() => router.replace("/"))}>
-          Sign out
-        </Button>
+        <Link href="/account" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+          <UserRoundIcon /> Account
+        </Link>
       </header>
 
       {outfit && (
@@ -89,7 +88,8 @@ export default function OutfitPage() {
               <TabsTrigger value="saved">Saved</TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="feed" className="mt-6">
+          {/* kept mounted, so flicking to Saved and back doesn't reload the feed or lose "Load more" pages */}
+          <TabsContent value="feed" keepMounted className="mt-6">
             {/* while links are being analysed, the Analysing card below shows them instead */}
             {saved.data && !references.some((r) => r.status === "PENDING") && (
               <InspirationStrip references={references} items={saved.data.items} onEdit={() => setDialog("edit")} />
