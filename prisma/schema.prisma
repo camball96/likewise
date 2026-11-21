@@ -93,6 +93,7 @@ model Reference {
   imageUrl  String
   status    ReferenceStatus             @default(PENDING)
   embedding Unsupported("vector(768)")?
+  personal  Boolean                     @default(false) // likely a personal photo (taken on the user's phone, or a selfie)
   createdAt DateTime                    @default(now())
 
   @@index([outfitId])
@@ -118,6 +119,22 @@ model ListItem {
   createdAt DateTime @default(now())
 
   @@id([listId, productId])
+}
+
+enum ContactKind {
+  GENERAL // general enquiry
+  FEATURE // feature request
+}
+
+// Sent from the Contact page (also emailed to CONTACT_EMAIL when Resend is set up).
+model ContactMessage {
+  id        String      @id @default(uuid())
+  kind      ContactKind
+  name      String
+  email     String
+  message   String
+  userId    String? // set when the sender was signed in
+  createdAt DateTime    @default(now())
 }
 
 model Click {

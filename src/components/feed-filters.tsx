@@ -99,8 +99,8 @@ export function FeedFilters({ value, onChange }: { value: Filters; onChange: (f:
             <SheetTitle className="mt-1 text-3xl font-semibold">Filters</SheetTitle>
           </div>
 
-          <div className="grid flex-1 content-start gap-6 overflow-y-auto p-6">
-            <div className="grid gap-2">
+          <div className="grid grid-cols-1 flex-1 content-start gap-6 overflow-y-auto p-6">
+            <div className="grid grid-cols-1 gap-2">
               <Label>Size in stock</Label>
               <div className="flex flex-wrap gap-1.5">
                 {SIZES.map((s) => (
@@ -120,7 +120,7 @@ export function FeedFilters({ value, onChange }: { value: Filters; onChange: (f:
               </div>
             </div>
 
-            <div className="grid gap-2">
+            <div className="grid grid-cols-1 gap-2">
               <Label>Colour</Label>
               <div className="flex flex-wrap gap-1.5">
                 {Object.entries(COLOURS).map(([name, swatch]) => (
@@ -143,7 +143,7 @@ export function FeedFilters({ value, onChange }: { value: Filters; onChange: (f:
               </div>
             </div>
 
-            <div className="grid gap-2">
+            <div className="grid grid-cols-1 gap-2">
               <Label htmlFor="max-price">
                 Max price <span className="font-normal text-muted-foreground">{draft.maxPrice ? `up to $${draft.maxPrice}` : "any"}</span>
               </Label>

@@ -13,20 +13,14 @@ const env = () => ({
   }),
 });
 
-// Saves a JPEG and returns its public URL.
-export async function uploadImage(jpeg: Uint8Array<ArrayBuffer>) {
+// Saves a JPEG and returns its public URL. Each user's uploads share a folder (uploads/<user id>/), so
+// everything one person uploaded can be found and deleted together.
+export async function uploadImage(jpeg: Uint8Array<ArrayBuffer>, userId: string) {
   const { bucket, publicUrl, client } = env();
-  const key = `references/${randomUUID()}.jpg`;
+  const key = `uploads/${userId}/${randomUUID()}.jpg`;
   // sign, then send with plain fetch: aws4fetch's own fetch streams the body, and R2 requires a Content-Length
   const signed = await client.sign(`${bucket}/${key}`, { method: "PUT", body: jpeg, headers: { "content-type": "image/jpeg" } });
   const res = await fetch(signed.url, { method: "PUT", headers: signed.headers, body: jpeg });
   if (!res.ok) throw new Error(`R2 upload failed: ${res.status} ${await res.text()}`);
   return `${publicUrl}/${key}`;
-}
-
-// Deletes an uploaded photo by its public URL (anything else, like a pasted link's image, is left alone).
-export async function deleteImage(imageUrl: string) {
-  const { bucket, publicUrl, client } = env();
-  if (!publicUrl || !imageUrl.startsWith(`${publicUrl}/`)) return;
-  await client.fetch(`${bucket}/${imageUrl.slice(publicUrl.length + 1)}`, { method: "DELETE" }).catch(() => {});
 }

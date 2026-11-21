@@ -1,3 +1,16 @@
+import exifr from "exifr";
+
+// Whether a photo was taken on a camera or phone (its file names the device). Screenshots and images
+// saved from websites usually don't. Read before toJpegBase64, which drops this metadata.
+export async function fromCamera(file: File): Promise<boolean> {
+  try {
+    const tags = await exifr.parse(file, ["Make", "Model"]);
+    return Boolean(tags?.Make || tags?.Model);
+  } catch {
+    return false;
+  }
+}
+
 // Shrinks a chosen photo to at most 1024px on its longest side and re-encodes it as JPEG (base64, no prefix).
 // Accepts anything the browser can open (JPG, PNG, WebP, GIF, AVIF; HEIC on Safari) and keeps uploads small
 // (~100-300KB) whatever the camera produced; the model only needs 224px.

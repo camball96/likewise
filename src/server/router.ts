@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { deleteImage, uploadImage } from "./r2";
-import { protectedProcedure, router } from "./trpc";
+import { sendEmail } from "./email";
+import { uploadImage } from "./r2";
+import { protectedProcedure, publicProcedure, router } from "./trpc";
 
 const PAGE_SIZE = 24;
 
@@ -18,6 +19,32 @@ type FeedProduct = {
 };
 
 export const appRouter = router({
+  // Contact page: saved, then emailed to us (if Resend is set up). Works signed in or out.
+  contact: publicProcedure
+    .input(
+      z.object({
+        kind: z.enum(["GENERAL", "FEATURE"]),
+        name: z.string().trim().min(1).max(100),
+        email: z.email().max(200),
+        message: z.string().trim().min(1).max(5000),
+        website: z.string().max(0), // hidden field: only bots fill it in
+        turnstile: z.string().max(4000), // Cloudflare Turnstile token (see verifyTurnstile)
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (!(await verifyTurnstile(input.turnstile))) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Please complete the spam check and try again." });
+      }
+      const { kind, name, email, message } = input;
+      await ctx.db.contactMessage.create({ data: { kind, name, email, message, userId: ctx.user?.id } });
+      const label = input.kind === "FEATURE" ? "Feature request" : "General enquiry";
+      await sendEmail({
+        subject: `${label} from ${input.name}`,
+        text: `${label}\nFrom: ${input.name} <${input.email}>\n\n${input.message}`,
+        replyTo: input.email,
+      });
+    }),
+
   stores: protectedProcedure.query(({ ctx }) =>
     ctx.db.store.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
   ),
@@ -91,22 +118,21 @@ export const appRouter = router({
 
     // Add a style example from a photo on the user's device. The browser shrinks it to a JPEG first (src/lib/photo.ts).
     uploadExample: protectedProcedure
-      .input(z.object({ outfitId: z.string(), jpeg: z.base64().max(4_000_000) }))
+      .input(z.object({ outfitId: z.string(), jpeg: z.base64().max(4_000_000), camera: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
         await ownOutfit(ctx, input.outfitId);
         const bytes = Buffer.from(input.jpeg, "base64");
         if (bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new TRPCError({ code: "BAD_REQUEST", message: "That file isn't a photo." });
-        const imageUrl = await uploadImage(bytes);
-        const reference = await ctx.db.reference.create({ data: { outfitId: input.outfitId, imageUrl } });
+        const imageUrl = await uploadImage(bytes, ctx.user.id);
+        // taken on a phone or camera: likely personal (the fingerprint service may also flag it as a selfie)
+        const reference = await ctx.db.reference.create({ data: { outfitId: input.outfitId, imageUrl, personal: input.camera } });
         void fingerprintReference(ctx, reference.id, imageUrl);
         return reference;
       }),
 
+    // uploaded photos stay in R2 (under the user's folder) after their reference is removed
     removeReference: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
-      const reference = await ctx.db.reference.findFirst({ where: { id: input.id, outfit: { userId: ctx.user.id } } });
-      if (!reference) return;
-      await ctx.db.reference.delete({ where: { id: reference.id } });
-      await deleteImage(reference.imageUrl);
+      await ctx.db.reference.deleteMany({ where: { id: input.id, outfit: { userId: ctx.user.id } } });
     }),
 
     set: protectedProcedure
@@ -308,6 +334,19 @@ async function findImage(url: string): Promise<string | null> {
   return null;
 }
 
+// Checks a Cloudflare Turnstile token (contact form). Passes when TURNSTILE_SECRET_KEY isn't set, e.g. locally.
+async function verifyTurnstile(token: string) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) return true;
+  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ secret, response: token }),
+  });
+  const result = (await res.json().catch(() => ({}))) as { success?: boolean };
+  return result.success === true;
+}
+
 // Fingerprint a pasted link's photo with the Modal service (pipeline/modal_app.py), usually within seconds.
 // If that isn't set up or fails, fall back to a GitHub Actions run, which takes a few minutes.
 async function fingerprintReference(ctx: Ctx, id: string, imageUrl: string) {
@@ -333,8 +372,10 @@ async function fingerprintReference(ctx: Ctx, id: string, imageUrl: string) {
       signal: AbortSignal.timeout(90_000), // allows for a cold start
     });
     if (!res.ok) throw new Error(`fingerprint service: ${res.status}`);
-    const { embedding } = (await res.json()) as { embedding: number[] };
-    await ctx.db.$executeRaw`UPDATE "Reference" SET status = 'READY', embedding = ${`[${embedding.join(",")}]`}::vector WHERE id = ${id}`;
+    const { embedding, selfie } = (await res.json()) as { embedding: number[]; selfie?: boolean };
+    await ctx.db.$executeRaw`
+      UPDATE "Reference" SET status = 'READY', embedding = ${`[${embedding.join(",")}]`}::vector, personal = personal OR ${selfie ?? false}
+      WHERE id = ${id}`;
   } catch (e) {
     console.error(e);
     await startEmbeddingRun();

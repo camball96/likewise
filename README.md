@@ -82,9 +82,25 @@ After that, `.github/workflows/modal.yml` redeploys automatically whenever `pipe
 
 ## Photo uploads (Cloudflare R2)
 
-Users can upload their own inspiration photos as well as pasting links. The browser shrinks each photo to a JPEG of at most 1024px (`src/lib/photo.ts`), the server stores it in a Cloudflare R2 bucket (`src/server/r2.ts`) and fingerprints it like a pasted link. Removing the reference deletes the photo.
+Users can upload their own inspiration photos as well as pasting links. The browser shrinks each photo to a JPEG of at most 1024px (`src/lib/photo.ts`), the server stores it in a Cloudflare R2 bucket (`src/server/r2.ts`) and fingerprints it like a pasted link. Photos stay in the bucket after their reference is removed (deleted only on request, below).
+
+Each user's uploads are stored under `uploads/<user id>/`. To delete everything someone uploaded: find their id (`SELECT id FROM "user" WHERE email = '…'`), then delete that folder in the bucket (Objects → `uploads/<id>/`).
+
+`Reference.personal` flags uploads that are likely personal photos: taken on a phone or camera (the file names the device, checked in the browser before the photo is shrunk) or judged a selfie by the fingerprint service. It's a best guess, so treat every upload as potentially personal; the flag is for finding likely selfies in bulk (`SELECT "imageUrl" FROM "Reference" WHERE personal`).
 
 1. Cloudflare dashboard → **R2** → create a bucket (e.g. `likewise-uploads`).
 2. Bucket → **Settings → Public access**: connect a custom domain (e.g. `images.lkws.au`, if the domain's DNS is on Cloudflare) or enable the `r2.dev` URL. That's `R2_PUBLIC_URL` (no trailing slash).
 3. R2 → **Manage API tokens** → create a token with **Object Read & Write** on that bucket. It gives an Access Key ID and Secret Access Key.
 4. Set `R2_ACCOUNT_ID` (shown on the R2 overview page), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` and `R2_PUBLIC_URL` on Render and in `.env`.
+
+## Contact page and email
+
+`/contact` saves each message (general enquiry or feature request) in the `ContactMessage` table and, when `RESEND_API_KEY` is set, emails it to `CONTACT_EMAIL` with the sender as reply-to (`src/server/email.ts`).
+
+1. **Receiving (hello@lkws.au):** Cloudflare → lkws.au → **Email → Email Routing** → enable, then add a custom address `hello` that forwards to your inbox (confirm the verification email).
+2. **Sending (Resend):** create an account at resend.com → **Domains → Add domain** `lkws.au` → add the DNS records it shows in Cloudflare (DNS → Records) and wait for "Verified". Then **API Keys → Create** (sending access).
+3. Set `RESEND_API_KEY` (and optionally `CONTACT_EMAIL` / `EMAIL_FROM`) on Render and in `.env`.
+
+**Spam check (Cloudflare Turnstile):** Cloudflare → **Turnstile → Add widget** for `lkws.au` (and `localhost` for testing), then set `NEXT_PUBLIC_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. The site key is built into the page, so on Render set it before the deploy builds. Without the keys the check is skipped.
+
+`/privacy` is the privacy policy (`src/app/privacy/page.tsx`); update its date when it changes.

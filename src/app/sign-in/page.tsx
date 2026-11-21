@@ -47,7 +47,7 @@ export default function SignInPage() {
           <Steps className="mt-6 max-md:hidden" />
         </section>
 
-        <div className="panel mx-auto grid w-full max-w-md gap-5">
+        <div className="panel mx-auto grid grid-cols-1 w-full max-w-md gap-5">
           <h2 className="font-heading text-3xl font-semibold">{mode === "sign-in" ? "Welcome back" : "Create your account"}</h2>
 
           <Button variant="outline" size="lg" onClick={() => authClient.signIn.social({ provider: "google", callbackURL: "/" })}>
@@ -58,18 +58,18 @@ export default function SignInPage() {
             <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
           </div>
 
-          <form onSubmit={onSubmit} className="grid gap-4">
+          <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4">
             {mode === "sign-up" && (
-              <div className="grid gap-2">
+              <div className="grid grid-cols-1 gap-2">
                 <Label htmlFor="name">Name</Label>
                 <Input id="name" name="name" required />
               </div>
             )}
-            <div className="grid gap-2">
+            <div className="grid grid-cols-1 gap-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" name="email" type="email" required />
             </div>
-            <div className="grid gap-2">
+            <div className="grid grid-cols-1 gap-2">
               <Label htmlFor="password">Password</Label>
               <Input id="password" name="password" type="password" minLength={8} required />
             </div>

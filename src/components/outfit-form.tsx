@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PhotoButton } from "@/components/photo-button";
-import { toJpegBase64 } from "@/lib/photo";
+import { fromCamera, toJpegBase64 } from "@/lib/photo";
 import { useTRPC } from "@/lib/trpc";
 
 // must match the categories the ingest pipeline assigns (pipeline/shopify.py)
@@ -76,7 +76,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
       const urls = links.map((l) => l.trim()).filter(Boolean);
       const results = await Promise.allSettled([
         ...urls.map((url) => addExample.mutateAsync({ outfitId, url })),
-        ...photos.map(async ({ file }) => uploadExample.mutateAsync({ outfitId, jpeg: await toJpegBase64(file) })),
+        ...photos.map(async ({ file }) => uploadExample.mutateAsync({ outfitId, camera: await fromCamera(file), jpeg: await toJpegBase64(file) })),
       ]);
       const bad = [...urls, ...photos.map((p) => p.file.name)].filter((_, i) => results[i].status === "rejected");
       if (bad.length) setFailed({ outfitId, urls: bad });
@@ -93,7 +93,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
         <p className="mt-2 text-sm text-muted-foreground">
           Your outfit is saved, but we couldn&apos;t add {failed.urls.length === 1 ? "this one" : "these"}:
         </p>
-        <ul className="mt-3 grid gap-1 text-sm">
+        <ul className="mt-3 grid grid-cols-1 gap-1 text-sm">
           {failed.urls.map((url) => (
             <li key={url} className="truncate text-destructive">
               {url}
@@ -108,15 +108,15 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
   }
 
   return (
-    <form onSubmit={onSubmit} className="panel grid min-w-0 gap-6 [&>*]:min-w-0">
+    <form onSubmit={onSubmit} className="panel grid min-w-0 grid-cols-1 gap-6">
       {title && <h2 className="font-heading text-3xl font-semibold">{title}</h2>}
 
-      <div className="grid gap-2">
+      <div className="grid grid-cols-1 gap-2">
         <Label htmlFor="outfit-name">What are you shopping for?</Label>
         <Input id="outfit-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Formal dresses" required maxLength={40} />
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid grid-cols-1 gap-2">
         <Label>Inspiration</Label>
         <p className="-mt-1 text-xs text-muted-foreground">Links to pieces you love (any store, Pinterest or Instagram) or your own photos. A few is plenty.</p>
         {existing.map((e) => (
@@ -157,7 +157,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
         </div>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid grid-cols-1 gap-2">
         <Label>What kind of pieces?</Label>
         <div className="flex flex-wrap gap-1.5">
           {CATEGORIES.map((c) => (
@@ -176,7 +176,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
         <p className="text-xs text-muted-foreground">{categories.length ? `Only ${categories.join(", ")}` : "None picked: everything"}</p>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid grid-cols-1 gap-2">
         <Label>Stores</Label>
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">

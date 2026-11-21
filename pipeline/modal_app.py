@@ -6,6 +6,19 @@ Modal-Key / Modal-Secret headers. See README → "Fingerprint service (Modal)".
 """
 import modal
 
+# For the "likely personal" flag on uploaded photos: a photo whose closest description is in PERSONAL counts as a selfie.
+PERSONAL = [
+    "a mirror selfie taken on a phone",
+    "a selfie of a person's face",
+    "a casual photo of a person taken on a phone at home",
+]
+OTHER = [
+    "a professional fashion product photo on a plain background",
+    "a model in a fashion campaign photo",
+    "a street style fashion photo",
+    "a screenshot of a shopping website",
+]
+
 
 def download_model():
     import open_clip
@@ -36,6 +49,7 @@ class Fingerprint:
         from embed import Embedder
 
         self.embedder = Embedder()
+        self.descriptions = self.embedder.text(PERSONAL + OTHER)
 
     @modal.enter()
     def after_restore(self):
@@ -53,4 +67,6 @@ class Fingerprint:
             photo = load_image(body["url"])
         except Exception as e:
             raise HTTPException(422, f"couldn't download the image: {e}")
-        return {"embedding": self.embedder.images([photo])[0].tolist()}
+        v = self.embedder.images([photo])[0]
+        closest = int((self.descriptions @ v).argmax())
+        return {"embedding": v.tolist(), "selfie": closest < len(PERSONAL)}
