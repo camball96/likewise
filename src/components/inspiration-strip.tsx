@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2Icon, PlusIcon } from "lucide-react";
-import { sized } from "@/components/product-card";
+import { sized } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 type Reference = { id: string; imageUrl: string; status: string };

@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Arrow, GridIcon, Hanger, Heart, PinIcon, Sparkle, TagIcon } from "@/components/doodles";
-import { sized } from "@/components/product-card";
+import { sized } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { auth } from "@/server/auth";
 import { db } from "@/server/db";

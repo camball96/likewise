@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Suspense, useState } from "react";
 import { Steps } from "@/components/steps";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ const GOOGLE_ERRORS: Record<string, string> = {
 
 function SignInPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const params = useSearchParams();
   // /sign-in?mode=sign-up (the landing page's buttons) opens on "Create your account"
   const [mode, setMode] = useState<"sign-in" | "sign-up">(params.get("mode") === "sign-up" ? "sign-up" : "sign-in");
@@ -52,6 +54,7 @@ function SignInPage() {
         : await authClient.signUp.email({ email, password, name: String(form.get("name")), callbackURL: "/welcome" });
     setBusy(false);
     if (error) return setError(error.message ?? "Something went wrong");
+    queryClient.clear(); // nothing cached from a previous session carries over
     router.replace("/");
   }
 

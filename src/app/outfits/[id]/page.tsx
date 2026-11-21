@@ -1,23 +1,20 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2Icon, PencilIcon, PlusIcon, UserRoundIcon } from "lucide-react";
-import Link from "next/link";
+import { BookmarkIcon, Loader2Icon, PencilIcon } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Analysing } from "@/components/analysing";
+import { AppHeader } from "@/components/app-header";
 import { SavedLists } from "@/components/lists";
 import { FeedFilters, filterCount, NO_FILTERS, type Filters } from "@/components/feed-filters";
 import { InspirationStrip } from "@/components/inspiration-strip";
 import { InstallPrompt } from "@/components/install-prompt";
 import { OutfitForm } from "@/components/outfit-form";
-import { PhotoButton } from "@/components/photo-button";
 import { ProductCard, type CardProduct } from "@/components/product-card";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { fromCamera, toJpegBase64 } from "@/lib/photo";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 
 export default function OutfitPage() {
@@ -34,7 +31,29 @@ export default function OutfitPage() {
   useEffect(() => {
     if (outfits.data && !outfit) router.replace("/welcome");
   }, [outfits.data, outfit, router]);
-  const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
+  const [dialog, setDialog] = useState<"new" | "edit" | null>(null); // the results form: + in the header, or the pencil
+  // "Picked for you", or the account's collections
+  const [tabState, setTabState] = useState({ outfitId: id, value: "feed" });
+  const tab = tabState.outfitId === id ? tabState.value : "feed"; // switching results pages starts on the feed
+  // saving a piece to a collection nudges the Collections tab, leaves a dot on it until it's
+  // opened, and pops up "Saved to …" at the bottom (the tabs are off screen once the feed is scrolled)
+  const [collected, setCollected] = useState(0);
+  const [savedTo, setSavedTo] = useState<{ name: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!savedTo) return;
+    const timer = setTimeout(() => setSavedTo(null), 6000);
+    return () => clearTimeout(timer);
+  }, [savedTo]);
+  const showCollections = () => {
+    setTab("collections");
+    setSavedTo(null);
+    setTimeout(() => document.getElementById("collections")?.scrollIntoView({ behavior: "smooth" }), 50);
+  };
+  const setTab = (value: string) => {
+    setTabState({ outfitId: id, value });
+    if (value === "collections") setCollected(0);
+  };
+  const edit = () => setDialog("edit");
   // poll while pasted links are being analysed; the feed restarts when one becomes ready
   const saved = useQuery({
     ...trpc.items.saved.queryOptions({ outfitId: id }),
@@ -50,49 +69,39 @@ export default function OutfitPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-3 pb-16 sm:px-5">
-      <header className="sticky top-0 z-10 -mx-3 flex items-center gap-3 border-b border-foreground/5 bg-background/85 px-3 py-3 backdrop-blur sm:-mx-5 sm:px-5">
-        <Link href="/" className="font-heading text-3xl font-semibold">
-          like<em className="text-[#6e4a35]">wise</em>
-        </Link>
-        <nav className="flex flex-1 gap-1 overflow-x-auto">
-          {outfits.data?.map((o) => (
-            <Link
-              key={o.id}
-              href={`/outfits/${o.id}`}
-              className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm transition-colors ${o.id === id ? "bg-primary text-primary-foreground" : "hover:bg-secondary"}`}
-            >
-              {o.name}
-            </Link>
-          ))}
-          <Button variant="ghost" size="icon" aria-label="New results" onClick={() => setDialog("new")}>
-            <PlusIcon />
-          </Button>
-        </nav>
-        <Link href="/account" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-          <UserRoundIcon /> Account
-        </Link>
-      </header>
+      <AppHeader activeId={id} onNew={() => setDialog("new")} />
 
       {outfit && (
-        <Tabs defaultValue="feed" className="mt-8">
+        <Tabs value={tab} onValueChange={(v) => setTab(String(v))} className="mt-8">
           <p className="eyebrow">Curated results</p>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <h1 className="flex items-center gap-1 font-heading text-4xl font-semibold sm:text-5xl">
               {outfit.name}
-              <Button variant="ghost" size="icon" aria-label="Edit results" onClick={() => setDialog("edit")}>
+              <Button variant="ghost" size="icon" aria-label="Edit results" onClick={edit}>
                 <PencilIcon />
               </Button>
             </h1>
             <TabsList>
               <TabsTrigger value="feed">Picked for you</TabsTrigger>
-              <TabsTrigger value="saved">Saved</TabsTrigger>
+              <TabsTrigger value="collections">
+                {/* re-keyed on each save so the nudge plays again */}
+                <span key={collected} className={`flex items-center gap-1.5 ${collected ? "motion-safe:animate-[nudge_0.6s_ease-out]" : ""}`}>
+                  Collections
+                  {collected > 0 && (
+                    <span aria-hidden className="relative flex size-2">
+                      <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c0573f] opacity-75 [animation-iteration-count:3]" />
+                      <span className="relative inline-flex size-2 rounded-full bg-[#c0573f]" />
+                    </span>
+                  )}
+                </span>
+              </TabsTrigger>
             </TabsList>
           </div>
-          {/* kept mounted, so flicking to Saved and back doesn't reload the feed or lose "Load more" pages */}
+          {/* kept mounted, so flicking to Collections and back doesn't reload the feed or lose "Load more" pages */}
           <TabsContent value="feed" keepMounted className="mt-6">
             {/* while links are being analysed, the Analysing card below shows them instead */}
             {saved.data && !references.some((r) => r.status === "PENDING") && (
-              <InspirationStrip references={references} items={saved.data.items} onEdit={() => setDialog("edit")} />
+              <InspirationStrip references={references} items={saved.data.items} onEdit={edit} />
             )}
             {/* feed toolbar, set apart from the outfit's header by a hairline */}
             <div className="mb-5 flex items-start justify-between gap-3 border-t border-foreground/10 pt-5">
@@ -109,15 +118,34 @@ export default function OutfitPage() {
               onClearFilters={() => setFilters(NO_FILTERS)}
               categories={outfit.categories}
               storeCount={outfit.stores.length}
-              onEdit={() => setDialog("edit")}
+              onEdit={edit}
+              onCollected={(name) => {
+                setCollected((n) => n + 1);
+                setSavedTo({ name, at: Date.now() });
+              }}
             />
           </TabsContent>
-          <TabsContent value="saved" className="mt-6">
-            <Saved outfitId={outfit.id} />
+          <TabsContent value="collections" className="mt-6">
+            <SavedLists outfitId={outfit.id} />
           </TabsContent>
         </Tabs>
       )}
 
+      {savedTo && (
+        <div
+          key={savedTo.at}
+          role="status"
+          className="fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-sm items-center gap-3 rounded-full bg-primary py-2 pr-2 pl-5 text-sm text-primary-foreground shadow-xl motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-4"
+        >
+          <BookmarkIcon className="size-4 shrink-0" fill="currentColor" />
+          <span className="min-w-0 flex-1 truncate">
+            Saved to <span className="font-semibold">{savedTo.name || "your collection"}</span>
+          </span>
+          <Button size="sm" variant="secondary" className="shrink-0 rounded-full" onClick={showCollections}>
+            See collections
+          </Button>
+        </div>
+      )}
       <InstallPrompt />
       <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
         <DialogContent showCloseButton={false} className="max-h-[90vh] overflow-y-auto bg-transparent p-0 ring-0 sm:max-w-md">
@@ -142,7 +170,10 @@ function useSetItem(outfitId: string) {
   const queryClient = useQueryClient();
   return useMutation(
     trpc.items.set.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: trpc.items.saved.queryKey({ outfitId }) }),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: trpc.items.saved.queryKey({ outfitId }) });
+        queryClient.invalidateQueries({ queryKey: trpc.items.hearted.queryKey() }); // the wishlist and its count
+      },
     }),
   );
 }
@@ -157,6 +188,7 @@ function Feed({
   categories,
   storeCount,
   onEdit,
+  onCollected,
 }: {
   outfitId: string;
   filters: Filters;
@@ -164,27 +196,36 @@ function Feed({
   categories: string[];
   storeCount: number;
   onEdit: () => void;
+  onCollected: (listName: string) => void;
 }) {
   const client = useTRPCClient(); // feed pages aren't cached: each one depends on what's already been shown
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const setItem = useSetItem(outfitId);
   const [products, setProducts] = useState<CardProduct[]>([]);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
   const started = useRef(false);
   const shown = useRef<string[]>([]);
 
   const loadMore = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
       const page = await client.feed.query({ outfitId, exclude: [...shown.current], ...filters });
       shown.current.push(...page.map((p) => p.id));
       setProducts((prev) => [...prev, ...page]);
       if (page.length < FEED_PAGE) setDone(true);
+    } catch {
+      setFailed(true);
+      // e.g. this results page was deleted: refresh the list, and the page moves on to one that exists
+      queryClient.invalidateQueries({ queryKey: trpc.outfits.list.queryKey() });
     } finally {
       setLoading(false);
     }
-  }, [client, filters, outfitId]);
+  }, [client, filters, outfitId, queryClient, trpc]);
 
   // first page (once, even when React runs effects twice in development)
   useEffect(() => {
@@ -220,13 +261,23 @@ function Feed({
             liked={liked.has(p.id)}
             onLike={() => like(p.id)}
             onSkip={() => skip(p.id)}
-            onListed={() => setLiked((s) => new Set(s).add(p.id))}
+            onListed={(listName) => {
+              setLiked((s) => new Set(s).add(p.id));
+              onCollected(listName);
+            }}
           />
         ))}
       </div>
       {!done && (
         <div className="py-10 text-center">
-          {products.length > 0 ? (
+          {failed && !loading ? (
+            <div className="grid justify-items-center gap-3">
+              <p className="text-sm text-muted-foreground">We couldn&apos;t load {products.length ? "more picks" : "your picks"} just now.</p>
+              <Button variant="outline" onClick={loadMore}>
+                Try again
+              </Button>
+            </div>
+          ) : products.length > 0 ? (
             <Button variant="outline" size="lg" onClick={loadMore} disabled={loading}>
               {loading && <Loader2Icon className="animate-spin" />} {loading ? "Loading…" : "Load more"}
             </Button>
@@ -267,113 +318,4 @@ function Feed({
       )}
     </>
   );
-}
-
-// Style references (catalogue products + links from anywhere) and hearted pieces.
-function Saved({ outfitId }: { outfitId: string }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const refresh = () => queryClient.invalidateQueries({ queryKey: trpc.items.saved.queryKey({ outfitId }) });
-  const saved = useQuery({
-    ...trpc.items.saved.queryOptions({ outfitId }),
-    // poll while a pasted link is still being analysed
-    refetchInterval: (q) => (q.state.data?.references.some((r) => r.status === "PENDING") ? 5000 : false),
-  });
-  const setItem = useSetItem(outfitId);
-  const removeReference = useMutation(trpc.items.removeReference.mutationOptions({ onSuccess: refresh }));
-  const [url, setUrl] = useState("");
-  const addExample = useMutation(
-    trpc.items.addExample.mutationOptions({
-      onSuccess: () => {
-        setUrl("");
-        refresh();
-      },
-    }),
-  );
-
-  const uploadExample = useMutation(trpc.items.uploadExample.mutationOptions({ onSuccess: refresh }));
-  const [uploading, setUploading] = useState(false);
-  const [uploadFailed, setUploadFailed] = useState(false);
-  async function upload(files: File[]) {
-    setUploading(true);
-    setUploadFailed(false);
-    const results = await Promise.allSettled(files.map(async (file) => uploadExample.mutateAsync({ outfitId, camera: await fromCamera(file), jpeg: await toJpegBase64(file) })));
-    setUploadFailed(results.some((r) => r.status === "rejected"));
-    setUploading(false);
-  }
-
-  const items = saved.data?.items ?? [];
-  const examples = items.filter((i) => i.kind === "EXAMPLE");
-  const likes = items.filter((i) => i.kind === "LIKE");
-  const toCard = (i: (typeof items)[number]): CardProduct => ({ ...i.product, store: i.product.store.name });
-  const unsave = (productId: string) => setItem.mutate({ outfitId, productId, kind: null });
-
-  return (
-    <div className="grid gap-10">
-      <SavedLists outfitId={outfitId} />
-      <section className="border-t border-foreground/10 pt-10">
-        <p className="eyebrow">Your taste</p>
-        <h2 className="mt-1 font-heading text-3xl font-semibold">Style references</h2>
-        <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          Paste a link to anything you love (a product page from any store, a Pinterest pin, an Instagram post) or upload a photo. Everything you add
-          here shapes what we pick for you.
-        </p>
-        <form
-          className="flex max-w-2xl flex-wrap gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            addExample.mutate({ outfitId, url });
-          }}
-        >
-          <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" type="url" required className="min-w-48 flex-1" />
-          <Button type="submit" disabled={addExample.isPending}>
-            {addExample.isPending ? "Adding…" : "Add"}
-          </Button>
-          <PhotoButton onPick={upload} disabled={uploading}>
-            {uploading ? "Uploading…" : "Upload photo"}
-          </PhotoButton>
-        </form>
-        {addExample.error && <p className="mt-2 text-sm text-destructive">{addExample.error.message}</p>}
-        {uploadFailed && <p className="mt-2 text-sm text-destructive">Couldn&apos;t upload that photo. Try a JPG, PNG or WebP.</p>}
-        <Grid>
-          {saved.data?.references.map((r) => (
-            <article key={r.id} className="min-w-0">
-              <a href={r.sourceUrl ?? r.imageUrl} target="_blank" rel="noopener" className="relative block aspect-[3/4] overflow-hidden rounded-2xl bg-secondary">
-                <img src={r.imageUrl} alt="" className="size-full object-cover" />
-                {r.status !== "READY" && (
-                  <span className="absolute inset-x-2 top-2 flex items-center justify-center gap-1.5 rounded-full bg-card/90 px-2 py-1 text-xs">
-                    {r.status === "PENDING" && <Loader2Icon className="size-3.5 animate-spin" />}
-                    {r.status === "PENDING" ? "Analysing…" : "Couldn't read this image"}
-                  </span>
-                )}
-              </a>
-              <div className="flex items-center justify-between pt-2 text-sm">
-                <span className="truncate text-muted-foreground">{r.sourceUrl ? new URL(r.sourceUrl).hostname.replace(/^www\./, "") : "Your photo"}</span>
-                <button className="text-xs underline" onClick={() => removeReference.mutate({ id: r.id })}>
-                  Remove
-                </button>
-              </div>
-            </article>
-          ))}
-          {examples.map((i) => (
-            <ProductCard key={i.productId} product={toCard(i)} outfitId={outfitId} liked onLike={() => unsave(i.productId)} />
-          ))}
-        </Grid>
-      </section>
-      <section className="border-t border-foreground/10 pt-10">
-        <p className="eyebrow">Saved from your picks</p>
-        <h2 className="mt-1 font-heading text-3xl font-semibold">Hearted</h2>
-        {likes.length === 0 && <p className="text-sm text-muted-foreground">Tap the heart on anything you like in the feed.</p>}
-        <Grid>
-          {likes.map((i) => (
-            <ProductCard key={i.productId} product={toCard(i)} outfitId={outfitId} liked onLike={() => unsave(i.productId)} />
-          ))}
-        </Grid>
-      </section>
-    </div>
-  );
-}
-
-function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-4 lg:grid-cols-6">{children}</div>;
 }

@@ -143,6 +143,23 @@ export const appRouter = router({
         return reference;
       }),
 
+    // The wishlist: every hearted piece from all the user's results pages, newest heart first, once each
+    // (the same piece can be hearted on more than one page). outfitId is the page it was hearted on most recently.
+    hearted: protectedProcedure.query(async ({ ctx }) => {
+      const items = await ctx.db.outfitItem.findMany({
+        where: { kind: "LIKE", outfit: { userId: ctx.user.id } },
+        orderBy: { createdAt: "desc" },
+        include: { product: { include: { store: true } } },
+      });
+      const seen = new Set<string>();
+      return items.filter((i) => !seen.has(i.productId) && seen.add(i.productId));
+    }),
+
+    // Un-heart from the wishlist: removes the heart on every results page (inspiration examples stay)
+    unheart: protectedProcedure.input(z.object({ productId: z.string() })).mutation(async ({ ctx, input }) => {
+      await ctx.db.outfitItem.deleteMany({ where: { productId: input.productId, kind: "LIKE", outfit: { userId: ctx.user.id } } });
+    }),
+
     // uploaded photos stay in R2 (under the user's folder) after their reference is removed
     removeReference: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
       await ctx.db.reference.deleteMany({ where: { id: input.id, outfit: { userId: ctx.user.id } } });

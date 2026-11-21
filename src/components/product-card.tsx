@@ -1,5 +1,10 @@
+"use client";
+
 import { HeartIcon, XIcon } from "lucide-react";
+import { useState } from "react";
 import { ListPicker } from "@/components/lists";
+import { burstRing, cardButton, springIn } from "@/components/card-button";
+import { sized } from "@/lib/utils";
 
 export type CardProduct = {
   id: string;
@@ -12,8 +17,6 @@ export type CardProduct = {
   store: string;
 };
 
-// Shopify CDNs resize on the fly via ?width=
-export const sized = (url: string, w: number) => `${url}${url.includes("?") ? "&" : "?"}width=${w}`;
 const money = (n: number) => `$${Number.isInteger(n) ? n : n.toFixed(2)}`;
 
 export function ProductCard({
@@ -31,8 +34,9 @@ export function ProductCard({
   onLike?: () => void; // no heart button when missing (e.g. inside a list)
   onSkip?: () => void;
   skipLabel?: string;
-  onListed?: () => void; // added to a list, which also hearts it
+  onListed?: (listName: string) => void; // added to a collection, which also hearts it
 }) {
+  const [hearted, setHearted] = useState(0); // taps that hearted it, to replay the animation
   const href = `/go/${product.id}?outfit=${outfitId}`;
   const onSale = product.compareAt && product.compareAt > product.price;
   const badge = onSale ? `−${Math.round((1 - product.price / product.compareAt!) * 100)}%` : product.isNew ? "New" : null;
@@ -80,11 +84,18 @@ export function ProductCard({
             <ListPicker productId={product.id} outfitId={outfitId} onAdd={onListed} />
             {onLike && (
               <button
-                onClick={onLike}
+                onClick={() => {
+                  if (!liked) setHearted((n) => n + 1);
+                  onLike();
+                }}
+                onTouchStart={() => {}} // lets iOS show the pressed state
                 aria-label="Save"
-                className={`grid size-9 place-items-center rounded-full shadow ${liked ? "bg-destructive text-white" : "bg-card/90"}`}
+                aria-pressed={liked}
+                className={`${cardButton} ${liked ? "bg-destructive text-white" : "bg-card/90 hover:text-destructive"}`}
               >
-                <HeartIcon className="size-4" fill={liked ? "currentColor" : "none"} />
+                {/* springs in (with a burst) when tapped on, not when a page loads with it already hearted */}
+                <HeartIcon key={hearted} className={`size-4 ${liked && hearted ? springIn : ""}`} fill={liked ? "currentColor" : "none"} />
+                {liked && hearted > 0 && <span key={`burst-${hearted}`} className={`${burstRing} ring-destructive`} />}
               </button>
             )}
           </div>
