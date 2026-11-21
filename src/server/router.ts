@@ -399,7 +399,7 @@ async function weighName(ctx: Ctx, outfit: { id: string; name: string; categorie
   if (row?.weighed) return;
   weighing.add(outfit.id);
   try {
-    const { embedding } = await callFingerprintService({ text: outfit.name }, 20_000);
+    const { embedding } = await callFingerprintService({ text: outfit.name }); // full timeout: a cold start can take a while
     const vec = `[${embedding.join(",")}]`;
     const [{ fit }] = await ctx.db.$queryRaw<{ fit: number | null }[]>`
       SELECT avg(1 - d)::float8 AS fit FROM (

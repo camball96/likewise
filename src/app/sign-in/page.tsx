@@ -18,11 +18,23 @@ export default function Page() {
   );
 }
 
+// Google sign-in failures come back here as ?error=<code> (errorCallbackURL below)
+const GOOGLE_ERRORS: Record<string, string> = {
+  account_not_linked:
+    "This email already has a likewise account with a password. Sign in with your email and password below. Once you've confirmed your email (it's in your welcome email), Google sign-in will work too.",
+  access_denied: "Google sign-in was cancelled.",
+};
+
 function SignInPage() {
   const router = useRouter();
+  const params = useSearchParams();
   // /sign-in?mode=sign-up (the landing page's buttons) opens on "Create your account"
-  const [mode, setMode] = useState<"sign-in" | "sign-up">(useSearchParams().get("mode") === "sign-up" ? "sign-up" : "sign-in");
-  const [error, setError] = useState("");
+  const [mode, setMode] = useState<"sign-in" | "sign-up">(params.get("mode") === "sign-up" ? "sign-up" : "sign-in");
+  const googleError = params.get("error");
+  const [error, setError] = useState(
+    googleError ? (GOOGLE_ERRORS[googleError] ?? "Google sign-in didn't work. Please try again, or use your email and password.") : "",
+  );
+  const passwordReset = params.get("reset") === "done"; // back from /reset-password
   const [agreed, setAgreed] = useState(false); // terms + privacy, required to create an account
   const blocked = mode === "sign-up" && !agreed;
   const [busy, setBusy] = useState(false);
@@ -37,7 +49,7 @@ function SignInPage() {
     const { error } =
       mode === "sign-in"
         ? await authClient.signIn.email({ email, password })
-        : await authClient.signUp.email({ email, password, name: String(form.get("name")) });
+        : await authClient.signUp.email({ email, password, name: String(form.get("name")), callbackURL: "/welcome" });
     setBusy(false);
     if (error) return setError(error.message ?? "Something went wrong");
     router.replace("/");
@@ -80,7 +92,7 @@ function SignInPage() {
             </label>
           )}
 
-          <Button variant="outline" size="lg" disabled={blocked} onClick={() => authClient.signIn.social({ provider: "google", callbackURL: "/" })}>
+          <Button variant="outline" size="lg" disabled={blocked} onClick={() => authClient.signIn.social({ provider: "google", callbackURL: "/", errorCallbackURL: "/sign-in" })}>
             Continue with Google
           </Button>
           {/* Google can create an account from here too, for someone new */}
@@ -114,10 +126,22 @@ function SignInPage() {
               <Input id="email" name="email" type="email" required />
             </div>
             <div className="grid grid-cols-1 gap-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-baseline justify-between">
+                <Label htmlFor="password">Password</Label>
+                {mode === "sign-in" && (
+                  <Link href="/reset-password" className="text-xs text-muted-foreground underline">
+                    Forgot password?
+                  </Link>
+                )}
+              </div>
               <Input id="password" name="password" type="password" minLength={8} required />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {passwordReset && !error && <p className="text-sm text-muted-foreground">Your password&apos;s been updated. Sign in with your new one.</p>}
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
             <Button type="submit" size="lg" disabled={busy || blocked}>
               {mode === "sign-in" ? "Sign in" : "Create account"}
             </Button>
