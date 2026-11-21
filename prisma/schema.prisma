@@ -53,7 +53,8 @@ model Outfit {
   user          User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
   categories    String[]                    @default([]) // e.g. ["Tops"]; empty = all categories
-  nameEmbedding Unsupported("vector(768)")? // text fingerprint of the name ("Floral tops"), filled in by the feed
+  nameEmbedding Unsupported("vector(768)")? // text fingerprint of the name ("Floral tops"), scaled by nameWeight; filled in by the feed
+  nameWeight    Float?                      @db.Real // 0-1: how well the name matches products in the categories; null = not worked out yet
   stores        Store[] // empty = all stores
   items         OutfitItem[]
   references    Reference[]
