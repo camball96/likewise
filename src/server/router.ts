@@ -73,7 +73,8 @@ export const appRouter = router({
         if (!input.id) {
           return ctx.db.outfit.create({ data: { ...data, userId: ctx.user.id, stores: { connect: stores } } });
         }
-        await ownOutfit(ctx, input.id);
+        const before = await ownOutfit(ctx, input.id);
+        if (before.name !== input.name) await ctx.db.$executeRaw`UPDATE "Outfit" SET "nameEmbedding" = NULL WHERE id = ${input.id}`;
         return ctx.db.outfit.update({ where: { id: input.id }, data: { ...data, stores: { set: stores } } });
       }),
 
@@ -224,8 +225,8 @@ export const appRouter = router({
       }),
   }),
 
-  // Products ranked by closeness to the outfit's examples, link references and hearts (hearts count double).
-  // With no examples yet, newest first.
+  // Products ranked by closeness to the outfit's examples, link references and hearts (hearts count double),
+  // plus what the user said they're shopping for (the outfit name), so there are results before any inspiration.
   feed: protectedProcedure
     .input(
       z.object({
@@ -242,6 +243,7 @@ export const appRouter = router({
     .query(async ({ ctx, input }) => {
       const outfit = await ownOutfit(ctx, input.outfitId);
       const storeIds = outfit.stores.map((s) => s.id);
+      await fingerprintName(ctx, outfit.id, outfit.name);
       return ctx.db.$queryRaw<FeedProduct[]>`
         WITH pos AS (
           SELECT p.embedding FROM "OutfitItem" i JOIN "Product" p ON p.id = i."productId"
@@ -251,6 +253,8 @@ export const appRouter = router({
           WHERE i."outfitId" = ${outfit.id} AND i.kind = 'LIKE' AND p.embedding IS NOT NULL
           UNION ALL
           SELECT r.embedding FROM "Reference" r WHERE r."outfitId" = ${outfit.id} AND r.status = 'READY'
+          UNION ALL
+          SELECT o."nameEmbedding" FROM "Outfit" o WHERE o.id = ${outfit.id} AND o."nameEmbedding" IS NOT NULL
         ), taste AS (SELECT avg(embedding) AS v FROM pos)
         SELECT p.id, p.title, p.url, p."imageUrl", p."hoverImageUrl", p.price, p."compareAt",
                p."publishedAt" > now() - interval '7 days' AS "isNew", s.name AS store
@@ -358,21 +362,8 @@ async function fingerprintReference(ctx: Ctx, id: string, imageUrl: string) {
     WHERE id = ${id} AND EXISTS (SELECT 1 FROM "Reference" WHERE "imageUrl" = ${imageUrl} AND status = 'READY' AND embedding IS NOT NULL)`;
   if (reused) return;
 
-  const url = process.env.MODAL_EMBED_URL;
   try {
-    if (!url) throw new Error("MODAL_EMBED_URL not set");
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "Modal-Key": process.env.MODAL_KEY ?? "",
-        "Modal-Secret": process.env.MODAL_SECRET ?? "",
-      },
-      body: JSON.stringify({ url: imageUrl }),
-      signal: AbortSignal.timeout(90_000), // allows for a cold start
-    });
-    if (!res.ok) throw new Error(`fingerprint service: ${res.status}`);
-    const { embedding, selfie } = (await res.json()) as { embedding: number[]; selfie?: boolean };
+    const { embedding, selfie } = await callFingerprintService({ url: imageUrl });
     await ctx.db.$executeRaw`
       UPDATE "Reference" SET status = 'READY', embedding = ${`[${embedding.join(",")}]`}::vector, personal = personal OR ${selfie ?? false}
       WHERE id = ${id}`;
@@ -380,6 +371,43 @@ async function fingerprintReference(ctx: Ctx, id: string, imageUrl: string) {
     console.error(e);
     await startEmbeddingRun();
   }
+}
+
+// The text fingerprint of an outfit's name ("Floral tops"), made once and reused for the same words.
+// Without the Modal service the feed just ranks by inspiration and hearts, as before.
+async function fingerprintName(ctx: Ctx, id: string, name: string) {
+  const [row] = await ctx.db.$queryRaw<{ ready: boolean }[]>`SELECT "nameEmbedding" IS NOT NULL AS ready FROM "Outfit" WHERE id = ${id}`;
+  if (row?.ready) return;
+  const reused = await ctx.db.$executeRaw`
+    UPDATE "Outfit" SET "nameEmbedding" = (
+      SELECT "nameEmbedding" FROM "Outfit" WHERE lower(name) = lower(${name}) AND "nameEmbedding" IS NOT NULL LIMIT 1
+    )
+    WHERE id = ${id} AND EXISTS (SELECT 1 FROM "Outfit" WHERE lower(name) = lower(${name}) AND "nameEmbedding" IS NOT NULL)`;
+  if (reused || !process.env.MODAL_EMBED_URL) return;
+  try {
+    const { embedding } = await callFingerprintService({ text: name });
+    await ctx.db.$executeRaw`UPDATE "Outfit" SET "nameEmbedding" = ${`[${embedding.join(",")}]`}::vector WHERE id = ${id}`;
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+// pipeline/modal_app.py: send { url } for a photo or { text } for words, get a fingerprint back
+async function callFingerprintService(body: { url: string } | { text: string }) {
+  const url = process.env.MODAL_EMBED_URL;
+  if (!url) throw new Error("MODAL_EMBED_URL not set");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "Modal-Key": process.env.MODAL_KEY ?? "",
+      "Modal-Secret": process.env.MODAL_SECRET ?? "",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(90_000), // allows for a cold start
+  });
+  if (!res.ok) throw new Error(`fingerprint service: ${res.status}`);
+  return (await res.json()) as { embedding: number[]; selfie?: boolean };
 }
 
 // Ask GitHub Actions to fingerprint pending references now (instead of waiting for the daily run).

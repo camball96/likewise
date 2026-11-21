@@ -30,7 +30,7 @@ export default function PrivacyPage() {
               email address and profile picture from Google.
             </li>
             <li>
-              <b>Your outfits and taste:</b> the outfits you create, the links you paste, the photos you upload, and the pieces you heart, skip or save to lists.
+              <b>Your searches and taste:</b> what you tell us you&apos;re shopping for, the links you paste, the photos you upload, and the pieces you heart, skip or save to collections.
             </li>
             <li>
               <b>Your activity:</b> when you tap a product to visit a store, we record which product, so we can understand what&apos;s useful.
@@ -49,9 +49,9 @@ export default function PrivacyPage() {
           <h2>Photos you upload</h2>
           <p>
             Before a photo leaves your device, it&apos;s resized and the hidden details your camera adds (such as location) are removed. We store it so you can see
-            it in your outfit, and our style model turns it into a numeric &ldquo;fingerprint&rdquo; of its look to find similar clothing. We don&apos;t use your
+            it in your results, and our style model turns it into a numeric &ldquo;fingerprint&rdquo; of its look to find similar clothing. We don&apos;t use your
             photos to identify you or anyone else, and we don&apos;t use facial recognition. We may mark a photo as likely personal (for example a selfie) so we
-            can handle it with extra care. We keep uploaded photos after you remove them from an outfit, to help us improve likewise, and delete them when you
+            can handle it with extra care. We keep uploaded photos after you remove them from your results, to help us improve likewise, and delete them when you
             ask us to.
           </p>
         </section>
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
         <section>
           <h2>How we use it</h2>
           <ul>
-            <li>To run likewise: your account, your outfits, and the feed of pieces we pick for you.</li>
+            <li>To run likewise: your account, your searches, and the feed of pieces we pick for you.</li>
             <li>To improve the service, for example looking at which stores and styles people link to so we can decide which stores to add.</li>
             <li>To reply when you contact us.</li>
             <li>To keep likewise secure and prevent misuse.</li>

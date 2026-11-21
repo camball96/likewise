@@ -1,5 +1,5 @@
 {
-  "_note": "Shopify stores to pull products from. All of these are Australian-based (checked via each store's /meta.json: country AU, currency AUD). To add a store: confirm https://<domain>/products.json loads, then add a line. \"category\" puts every product from a single-category store (activewear, sleepwear) in that category. Set \"enabled\": false to pause one. max_products caps how many of the newest products are pulled per store.",
+  "_note": "Shopify stores to pull products from. All of these are Australian-based (checked via each store's /meta.json: country AU, currency AUD). To add a store: confirm https://<domain>/products.json loads, then add a line. \"category\" puts every product from a single-category store (activewear, sleepwear, lingerie) in that category. Set \"enabled\": false to pause one. max_products caps how many of the newest products are pulled per store.",
   "defaults": { "max_products": 750 },
   "stores": [
     { "key": "bronzesnake",  "name": "Bronze Snake",       "domain": "bronzesnake.com" },
@@ -87,6 +87,19 @@
     { "key": "jaggad",            "name": "Jaggad",              "domain": "jaggad.com", "category": "Activewear" },
     { "key": "nagnata",           "name": "Nagnata",             "domain": "nagnata.com", "category": "Activewear" },
     { "key": "papinelle",         "name": "Papinelle",           "domain": "papinelle.com", "category": "Sleepwear" },
-    { "key": "homebodii",         "name": "Homebodii",           "domain": "homebodii.com", "category": "Sleepwear" }
+    { "key": "homebodii",         "name": "Homebodii",           "domain": "homebodii.com", "category": "Sleepwear" },
+    { "key": "katthelabel",       "name": "Kat the Label",       "domain": "katthelabel.com", "category": "Lingerie" },
+    { "key": "saturday",          "name": "Saturday the Label",  "domain": "saturdaythelabel.com", "category": "Lingerie" },
+    { "key": "hara",              "name": "HARA The Label",      "domain": "harathelabel.com" },
+    { "key": "nico",              "name": "Nico",                "domain": "nicounderwear.com" },
+    { "key": "chouchou",          "name": "Chouchou Intimates",  "domain": "chouchouintimates.com", "category": "Lingerie" },
+    { "key": "ecointimates",      "name": "Eco Intimates",       "domain": "ecointimates.com.au", "category": "Lingerie" },
+    { "key": "hopeless",          "name": "Hopeless Lingerie",   "domain": "hopelesslingerie.com", "category": "Lingerie" },
+    { "key": "firstthing",        "name": "First Thing",         "domain": "firstthing.com.au", "category": "Lingerie" },
+    { "key": "bendon",            "name": "Bendon",              "domain": "bendonlingerie.com.au", "category": "Lingerie" },
+    { "key": "bimbyandroy",       "name": "Bimby + Roy",         "domain": "bimbyandroy.com.au" },
+    { "key": "sandrasilk",        "name": "Sandra Silk",         "domain": "sandrasilk.com.au", "category": "Lingerie" },
+    { "key": "lebuns",            "name": "Lé Buns",             "domain": "lebuns.com.au" },
+    { "key": "souszy",            "name": "Souszy",              "domain": "souszy.com.au", "category": "Lingerie" }
   ]
 }

@@ -48,15 +48,16 @@ model Product {
 // ---------- user data ----------
 
 model Outfit {
-  id         String       @id @default(uuid())
-  userId     String
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name       String
-  categories String[]     @default([]) // e.g. ["Tops"]; empty = all categories
-  stores     Store[] // empty = all stores
-  items      OutfitItem[]
-  references Reference[]
-  createdAt  DateTime     @default(now())
+  id            String                      @id @default(uuid())
+  userId        String
+  user          User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  categories    String[]                    @default([]) // e.g. ["Tops"]; empty = all categories
+  nameEmbedding Unsupported("vector(768)")? // text fingerprint of the name ("Floral tops"), filled in by the feed
+  stores        Store[] // empty = all stores
+  items         OutfitItem[]
+  references    Reference[]
+  createdAt     DateTime                    @default(now())
 
   @@index([userId])
 }

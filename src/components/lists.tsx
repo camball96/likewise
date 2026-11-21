@@ -43,13 +43,13 @@ export function ListPicker({ productId, outfitId, onAdd }: { productId: string; 
   return (
     <Popover>
       <PopoverTrigger
-        aria-label="Add to list"
+        aria-label="Add to collection"
         className={`grid size-9 place-items-center rounded-full shadow ${saved ? "bg-primary text-primary-foreground" : "bg-card/90"}`}
       >
         <BookmarkIcon className="size-4" fill={saved ? "currentColor" : "none"} />
       </PopoverTrigger>
       <PopoverContent align="end" className="grid grid-cols-1 w-72 gap-3 rounded-2xl bg-card p-4">
-        <p className="eyebrow">Save to a list</p>
+        <p className="eyebrow">Save to a collection</p>
         {lists.data?.map((l) => (
           <label key={l.id} className="flex cursor-pointer items-center gap-3 text-sm">
             <Checkbox checked={inList(l)} onCheckedChange={(checked) => set(l.id, checked)} />
@@ -66,8 +66,8 @@ export function ListPicker({ productId, outfitId, onAdd }: { productId: string; 
             set(list.id, true);
           }}
         >
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="New list, e.g. Sarah's wedding" maxLength={40} required />
-          <Button type="submit" size="icon" aria-label="Create list" disabled={create.isPending}>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="New collection, e.g. Sarah's wedding" maxLength={40} required />
+          <Button type="submit" size="icon" aria-label="Create collection" disabled={create.isPending}>
             <PlusIcon />
           </Button>
         </form>
@@ -125,11 +125,11 @@ export function SavedLists({ outfitId }: { outfitId: string }) {
   return (
     <section>
       <p className="eyebrow">For an occasion</p>
-      <h2 className="mt-1 font-heading text-3xl font-semibold">Lists</h2>
+      <h2 className="mt-1 font-heading text-3xl font-semibold">Collections</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         {lists.data?.length === 0
-          ? "Tap the bookmark on any piece to start a list, like \u201cSarah's wedding\u201d or \u201cBali trip\u201d."
-          : "Pieces you've bookmarked for an event or trip, from any outfit."}
+          ? "Tap the bookmark on any piece to start a collection, like \u201cSarah's wedding\u201d or \u201cBali trip\u201d."
+          : "Pieces you've bookmarked for an event or trip, from any of your results."}
       </p>
       {/* padding keeps the selected ring from being clipped by the scroller */}
       <div className="-mx-2 mt-3 flex gap-4 overflow-x-auto p-2">
@@ -196,7 +196,7 @@ export function SavedLists({ outfitId }: { outfitId: string }) {
               </Button>
             </div>
           </div>
-          {open.items.length === 0 && <p className="mt-2 text-sm text-muted-foreground">Nothing in this list yet.</p>}
+          {open.items.length === 0 && <p className="mt-2 text-sm text-muted-foreground">Nothing in this collection yet.</p>}
           <div className="mt-5 grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-4 lg:grid-cols-5">
             {open.items.map((i) => (
               <ProductCard
@@ -211,7 +211,7 @@ export function SavedLists({ outfitId }: { outfitId: string }) {
                     add: false,
                   })
                 }
-                skipLabel="Remove from list"
+                skipLabel="Remove from collection"
               />
             ))}
           </div>

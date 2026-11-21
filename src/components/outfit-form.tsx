@@ -13,7 +13,7 @@ import { fromCamera, toJpegBase64 } from "@/lib/photo";
 import { useTRPC } from "@/lib/trpc";
 
 // must match the categories the ingest pipeline assigns (pipeline/shopify.py)
-const CATEGORIES = ["Tops", "Dresses", "Skirts", "Shorts", "Pants", "Sets", "Knitwear", "Outerwear", "Jumpsuits", "Swim", "Activewear", "Sleepwear"];
+const CATEGORIES = ["Tops", "Dresses", "Skirts", "Shorts", "Pants", "Sets", "Knitwear", "Outerwear", "Jumpsuits", "Swim", "Activewear", "Sleepwear", "Lingerie"];
 
 type Outfit = { id: string; name: string; categories: string[]; stores: { id: string }[] };
 
@@ -91,7 +91,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
       <div className="panel">
         <h2 className="font-heading text-3xl font-semibold">Almost there</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your outfit is saved, but we couldn&apos;t add {failed.urls.length === 1 ? "this one" : "these"}:
+          Your results are saved, but we couldn&apos;t add {failed.urls.length === 1 ? "this one" : "these"}:
         </p>
         <ul className="mt-3 grid grid-cols-1 gap-1 text-sm">
           {failed.urls.map((url) => (
@@ -101,7 +101,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
           ))}
         </ul>
         <Button className="mt-6 w-full" size="lg" onClick={() => goTo(`/outfits/${failed.outfitId}`)}>
-          Go to my outfit <ArrowRightIcon />
+          Go to my results <ArrowRightIcon />
         </Button>
       </div>
     );
@@ -218,7 +218,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
           Cancel
         </Button>
         <Button type="submit" size="lg" className={outfit ? "" : "flex-1"} disabled={busy}>
-          {busy ? "Saving…" : outfit ? "Save" : "Create outfit"}
+          {busy ? "Saving…" : outfit ? "Save" : "Show my results"}
         </Button>
       </div>
     </form>
