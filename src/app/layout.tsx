@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Inter } from "next/font/google";
 import { SiteFooter } from "@/components/site-footer";
 import { Providers } from "@/lib/trpc";
@@ -20,8 +20,12 @@ export const metadata: Metadata = {
   description: "Australian women's fashion, picked for your taste.",
   openGraph: { ...preview, siteName: "likewise", locale: "en_AU", type: "website" },
   twitter: { ...preview, card: "summary_large_image" },
+  // added to an iPhone home screen: opens full screen with this name (the icon is apple-icon.png)
+  appleWebApp: { capable: true, title: "likewise", statusBarStyle: "default" },
   verification: { other: { "commission-factory-verification": "d3f25358ac22409d863e693d9d8c19bc" } },
 };
+
+export const viewport: Viewport = { themeColor: "#f5efe6" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (

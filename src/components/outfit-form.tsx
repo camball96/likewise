@@ -210,7 +210,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
             className="text-destructive"
             onClick={async () => {
               await remove.mutateAsync({ id: outfit.id });
-              await goTo("/");
+              await goTo("/welcome"); // opens their first results page, or the create form if that was the last one
             }}
           >
             Delete
