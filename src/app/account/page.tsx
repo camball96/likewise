@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftIcon, CheckIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ type Status = { ok: boolean; text: string } | null;
 // Google-only accounts can add a password through the reset-password email. (Delete account will live here too.)
 export default function AccountPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: session, refetch } = authClient.useSession();
   const [methods, setMethods] = useState<string[] | null>(null); // "credential" (email + password), "google"
   useEffect(() => {
@@ -38,7 +40,11 @@ export default function AccountPage() {
           <NameSection name={user.name} onSaved={refetch} />
           <EmailSection email={user.email} verified={user.emailVerified} onChanged={refetch} />
           <PasswordSection email={user.email} hasPassword={methods.includes("credential")} withGoogle={methods.includes("google")} />
-          <Button variant="outline" className="w-fit" onClick={() => authClient.signOut().then(() => router.replace("/"))}>
+          <Button variant="outline" className="w-fit" onClick={async () => {
+              await authClient.signOut();
+              queryClient.clear(); // forget this account's results and collections, so the next sign-in starts fresh
+              router.replace("/");
+            }}>
             Sign out
           </Button>
         </div>

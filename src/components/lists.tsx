@@ -3,12 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { BookmarkIcon, CheckIcon, PencilIcon, PlusIcon, Share2Icon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
-import { ProductCard, sized } from "@/components/product-card";
+import { ProductCard } from "@/components/product-card";
+import { sized } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useTRPC } from "@/lib/trpc";
+import { burstRing, cardButton, springIn } from "@/components/card-button";
 
 function useToggle(outfitId: string) {
   const trpc = useTRPC();
@@ -17,6 +19,7 @@ function useToggle(outfitId: string) {
     trpc.lists.toggle.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: trpc.lists.all.queryKey() });
+        queryClient.invalidateQueries({ queryKey: trpc.items.hearted.queryKey() }); // adding to a collection also hearts it
         queryClient.invalidateQueries({
           queryKey: trpc.items.saved.queryKey({ outfitId }),
         });
@@ -26,7 +29,7 @@ function useToggle(outfitId: string) {
 }
 
 // Bookmark button on a product card: tick the lists it belongs in, or start a new one.
-export function ListPicker({ productId, outfitId, onAdd }: { productId: string; outfitId: string; onAdd?: () => void }) {
+export function ListPicker({ productId, outfitId, onAdd }: { productId: string; outfitId: string; onAdd?: (listName: string) => void }) {
   const trpc = useTRPC();
   const lists = useQuery(trpc.lists.all.queryOptions());
   const toggle = useToggle(outfitId);
@@ -35,24 +38,29 @@ export function ListPicker({ productId, outfitId, onAdd }: { productId: string; 
   const inList = (l: NonNullable<typeof lists.data>[number]) => l.items.some((i) => i.productId === productId);
   const saved = lists.data?.some(inList);
 
-  function set(listId: string, add: boolean) {
+  const [added, setAdded] = useState(0); // times it's been added from here, to replay the animation
+  function set(listId: string, add: boolean, listName = "") {
     toggle.mutate({ listId, productId, outfitId, add });
-    if (add) onAdd?.();
+    if (add && !saved) setAdded((n) => n + 1);
+    if (add) onAdd?.(listName);
   }
 
   return (
     <Popover>
       <PopoverTrigger
         aria-label="Add to collection"
-        className={`grid size-9 place-items-center rounded-full shadow ${saved ? "bg-primary text-primary-foreground" : "bg-card/90"}`}
+        onTouchStart={() => {}} // lets iOS show the pressed state
+        className={`${cardButton} ${saved ? "bg-primary text-primary-foreground" : "bg-card/90 hover:text-[#6e4a35]"}`}
       >
-        <BookmarkIcon className="size-4" fill={saved ? "currentColor" : "none"} />
+        {/* springs in (with a burst) when first added from here, not when the page loads with it already saved */}
+        <BookmarkIcon key={added} className={`size-4 ${saved && added ? springIn : ""}`} fill={saved ? "currentColor" : "none"} />
+        {saved && added > 0 && <span key={`burst-${added}`} className={`${burstRing} ring-primary`} />}
       </PopoverTrigger>
       <PopoverContent align="end" className="grid grid-cols-1 w-72 gap-3 rounded-2xl bg-card p-4">
         <p className="eyebrow">Save to a collection</p>
         {lists.data?.map((l) => (
           <label key={l.id} className="flex cursor-pointer items-center gap-3 text-sm">
-            <Checkbox checked={inList(l)} onCheckedChange={(checked) => set(l.id, checked)} />
+            <Checkbox checked={inList(l)} onCheckedChange={(checked) => set(l.id, checked, l.name)} />
             <span className="flex-1 truncate">{l.name}</span>
             <span className="text-xs text-muted-foreground">{l.items.length}</span>
           </label>
@@ -63,7 +71,7 @@ export function ListPicker({ productId, outfitId, onAdd }: { productId: string; 
             e.preventDefault();
             const list = await create.mutateAsync({ name });
             setName("");
-            set(list.id, true);
+            set(list.id, true, list.name);
           }}
         >
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="New collection, e.g. Sarah's wedding" maxLength={40} required />
@@ -76,7 +84,7 @@ export function ListPicker({ productId, outfitId, onAdd }: { productId: string; 
   );
 }
 
-// "Lists" section of the Saved tab: a cover for each list, and the pieces of the one that's open.
+// The Collections tab: a cover for each collection, and the pieces of the one that's open.
 export function SavedLists({ outfitId }: { outfitId: string }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -123,7 +131,7 @@ export function SavedLists({ outfitId }: { outfitId: string }) {
   }
 
   return (
-    <section>
+    <section id="collections" className="scroll-mt-24">
       <p className="eyebrow">For an occasion</p>
       <h2 className="mt-1 font-heading text-3xl font-semibold">Collections</h2>
       <p className="mt-1 text-sm text-muted-foreground">
