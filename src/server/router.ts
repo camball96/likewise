@@ -71,7 +71,7 @@ export const appRouter = router({
     }),
 
     // Add a style example from a link. Products from our stores are added instantly; any other page
-    // (another store, Pinterest, Instagram...) is saved with its main image and fingerprinted by the next ingest run.
+    // (another store, Pinterest, Instagram...) is saved with its main image and fingerprinted in the background.
     addExample: protectedProcedure
       .input(z.object({ outfitId: z.string(), url: z.url() }))
       .mutation(async ({ ctx, input }) => {
@@ -84,7 +84,7 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Couldn't find a photo on that page. Try a different link." });
         }
         const reference = await ctx.db.reference.create({ data: { outfitId: input.outfitId, sourceUrl: input.url, imageUrl } });
-        await startEmbeddingRun();
+        void fingerprintReference(ctx, reference.id, imageUrl); // not awaited: the feed polls until it's ready
         return reference;
       }),
 
@@ -289,6 +289,39 @@ async function findImage(url: string): Promise<string | null> {
     // unreachable page, timeout, bad markup
   }
   return null;
+}
+
+// Fingerprint a pasted link's photo with the Modal service (pipeline/modal_app.py), usually within seconds.
+// If that isn't set up or fails, fall back to a GitHub Actions run, which takes a few minutes.
+async function fingerprintReference(ctx: Ctx, id: string, imageUrl: string) {
+  // the same photo was pasted before (e.g. a popular Pinterest pin): reuse its fingerprint
+  const reused = await ctx.db.$executeRaw`
+    UPDATE "Reference" SET status = 'READY', embedding = (
+      SELECT embedding FROM "Reference" WHERE "imageUrl" = ${imageUrl} AND status = 'READY' AND embedding IS NOT NULL LIMIT 1
+    )
+    WHERE id = ${id} AND EXISTS (SELECT 1 FROM "Reference" WHERE "imageUrl" = ${imageUrl} AND status = 'READY' AND embedding IS NOT NULL)`;
+  if (reused) return;
+
+  const url = process.env.MODAL_EMBED_URL;
+  try {
+    if (!url) throw new Error("MODAL_EMBED_URL not set");
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "Modal-Key": process.env.MODAL_KEY ?? "",
+        "Modal-Secret": process.env.MODAL_SECRET ?? "",
+      },
+      body: JSON.stringify({ url: imageUrl }),
+      signal: AbortSignal.timeout(90_000), // allows for a cold start
+    });
+    if (!res.ok) throw new Error(`fingerprint service: ${res.status}`);
+    const { embedding } = (await res.json()) as { embedding: number[] };
+    await ctx.db.$executeRaw`UPDATE "Reference" SET status = 'READY', embedding = ${`[${embedding.join(",")}]`}::vector WHERE id = ${id}`;
+  } catch (e) {
+    console.error(e);
+    await startEmbeddingRun();
+  }
 }
 
 // Ask GitHub Actions to fingerprint pending references now (instead of waiting for the daily run).
