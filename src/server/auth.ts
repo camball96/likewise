@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { db } from "./db";
 import { sendEmail } from "./email";
+import { welcomeEmail } from "./welcome-email";
 
 const google =
   process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
@@ -19,7 +20,11 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => ({ data: { ...user, termsAcceptedAt: new Date() } }),
-        after: async (user) => void notifyNewUser(user), // not awaited: never slows or breaks a sign-up
+        // not awaited: emails never slow or break a sign-up
+        after: async (user) => {
+          void notifyNewUser(user);
+          void sendEmail({ ...welcomeEmail(user.name), to: user.email, replyTo: process.env.CONTACT_EMAIL ?? "hello@lkws.au" });
+        },
       },
     },
   },

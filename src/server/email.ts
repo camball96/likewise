@@ -1,6 +1,8 @@
-// Emails us via Resend (resend.com). Does nothing until RESEND_API_KEY is set, and never throws:
-// the message is already saved in the database, so a failed email shouldn't fail the form.
-export async function sendEmail({ subject, text, replyTo }: { subject: string; text: string; replyTo?: string }) {
+// Sends an email via Resend (resend.com): to us (CONTACT_EMAIL) unless `to` is given. Does nothing until
+// RESEND_API_KEY is set, and never throws, so a failed email never fails the form or sign-up that sent it.
+type Email = { subject: string; text: string; html?: string; to?: string; replyTo?: string };
+
+export async function sendEmail({ subject, text, html, to, replyTo }: Email) {
   const key = process.env.RESEND_API_KEY;
   if (!key) return;
   try {
@@ -9,9 +11,10 @@ export async function sendEmail({ subject, text, replyTo }: { subject: string; t
       headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
       body: JSON.stringify({
         from: process.env.EMAIL_FROM ?? "likewise <noreply@lkws.au>",
-        to: process.env.CONTACT_EMAIL ?? "hello@lkws.au",
+        to: to ?? process.env.CONTACT_EMAIL ?? "hello@lkws.au",
         subject,
         text,
+        html,
         reply_to: replyTo,
       }),
     });
