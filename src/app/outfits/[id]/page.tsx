@@ -17,7 +17,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { authClient } from "@/lib/auth-client";
-import { toJpegBase64 } from "@/lib/photo";
+import { fromCamera, toJpegBase64 } from "@/lib/photo";
 import { useTRPC, useTRPCClient } from "@/lib/trpc";
 
 export default function OutfitPage() {
@@ -81,7 +81,10 @@ export default function OutfitPage() {
             </TabsList>
           </div>
           <TabsContent value="feed" className="mt-6">
-            {saved.data && <InspirationStrip references={references} items={saved.data.items} onEdit={() => setDialog("edit")} />}
+            {/* while links are being analysed, the Analysing card below shows them instead */}
+            {saved.data && !references.some((r) => r.status === "PENDING") && (
+              <InspirationStrip references={references} items={saved.data.items} onEdit={() => setDialog("edit")} />
+            )}
             {/* feed toolbar, set apart from the outfit's header by a hairline */}
             <div className="mb-5 flex items-start justify-between gap-3 border-t border-foreground/10 pt-5">
               <FeedFilters key={id} value={filters} onChange={setFilters} />
@@ -121,6 +124,8 @@ export default function OutfitPage() {
   );
 }
 
+const FEED_PAGE = 24; // products per feed page (PAGE_SIZE in src/server/router.ts)
+
 function useSetItem(outfitId: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -131,7 +136,8 @@ function useSetItem(outfitId: string) {
   );
 }
 
-// Infinite feed: each page asks the server for the next best matches, excluding what's already shown.
+// The feed: the first page loads straight away, then a "Load more" button asks the server for the next best matches,
+// excluding what's already shown (a button rather than infinite scroll, so the footer stays reachable).
 // Hearts and skips are saved immediately, so later pages reflect them.
 function Feed({
   outfitId,
@@ -153,27 +159,27 @@ function Feed({
   const [products, setProducts] = useState<CardProduct[]>([]);
   const [liked, setLiked] = useState<Set<string>>(new Set());
   const [done, setDone] = useState(false);
-  const loading = useRef(false);
+  const [loading, setLoading] = useState(false);
+  const started = useRef(false);
   const shown = useRef<string[]>([]);
-  const sentinel = useRef<HTMLDivElement>(null);
 
   const loadMore = useCallback(async () => {
-    if (loading.current || done) return;
-    loading.current = true;
+    setLoading(true);
     try {
       const page = await client.feed.query({ outfitId, exclude: [...shown.current], ...filters });
       shown.current.push(...page.map((p) => p.id));
       setProducts((prev) => [...prev, ...page]);
-      if (page.length === 0) setDone(true);
+      if (page.length < FEED_PAGE) setDone(true);
     } finally {
-      loading.current = false;
+      setLoading(false);
     }
-  }, [client, done, filters, outfitId]);
+  }, [client, filters, outfitId]);
 
+  // first page (once, even when React runs effects twice in development)
   useEffect(() => {
-    const observer = new IntersectionObserver((entries) => entries[0].isIntersecting && loadMore(), { rootMargin: "800px" });
-    if (sentinel.current) observer.observe(sentinel.current);
-    return () => observer.disconnect();
+    if (started.current) return;
+    started.current = true;
+    loadMore();
   }, [loadMore]);
 
   function like(id: string) {
@@ -207,7 +213,17 @@ function Feed({
           />
         ))}
       </div>
-      <div ref={sentinel} />
+      {!done && (
+        <div className="py-10 text-center">
+          {products.length > 0 ? (
+            <Button variant="outline" size="lg" onClick={loadMore} disabled={loading}>
+              {loading && <Loader2Icon className="animate-spin" />} {loading ? "Loading…" : "Load more"}
+            </Button>
+          ) : (
+            <Loader2Icon className="mx-auto size-6 animate-spin text-muted-foreground" />
+          )}
+        </div>
+      )}
       {done && products.length === 0 && filterCount(filters) > 0 && (
         <div className="mx-auto max-w-md py-20 text-center">
           <p className="eyebrow">Nothing in this edit</p>
@@ -270,7 +286,7 @@ function Saved({ outfitId }: { outfitId: string }) {
   async function upload(files: File[]) {
     setUploading(true);
     setUploadFailed(false);
-    const results = await Promise.allSettled(files.map(async (file) => uploadExample.mutateAsync({ outfitId, jpeg: await toJpegBase64(file) })));
+    const results = await Promise.allSettled(files.map(async (file) => uploadExample.mutateAsync({ outfitId, camera: await fromCamera(file), jpeg: await toJpegBase64(file) })));
     setUploadFailed(results.some((r) => r.status === "rejected"));
     setUploading(false);
   }

@@ -48,7 +48,7 @@ export function ListPicker({ productId, outfitId, onAdd }: { productId: string; 
       >
         <BookmarkIcon className="size-4" fill={saved ? "currentColor" : "none"} />
       </PopoverTrigger>
-      <PopoverContent align="end" className="grid w-72 gap-3 rounded-2xl bg-card p-4">
+      <PopoverContent align="end" className="grid grid-cols-1 w-72 gap-3 rounded-2xl bg-card p-4">
         <p className="eyebrow">Save to a list</p>
         {lists.data?.map((l) => (
           <label key={l.id} className="flex cursor-pointer items-center gap-3 text-sm">
