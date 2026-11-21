@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhotoButton } from "@/components/photo-button";
+import { toJpegBase64 } from "@/lib/photo";
 import { useTRPC } from "@/lib/trpc";
 
 // must match the categories the ingest pipeline assigns (pipeline/shopify.py)
@@ -26,12 +28,14 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
   const save = useMutation(trpc.outfits.save.mutationOptions());
   const remove = useMutation(trpc.outfits.delete.mutationOptions());
   const addExample = useMutation(trpc.items.addExample.mutationOptions());
+  const uploadExample = useMutation(trpc.items.uploadExample.mutationOptions());
   const removeReference = useMutation(trpc.items.removeReference.mutationOptions());
   const setItem = useMutation(trpc.items.set.mutationOptions());
 
   const [name, setName] = useState(outfit?.name ?? "");
   const [categories, setCategories] = useState<string[]>(outfit?.categories ?? []);
   const [links, setLinks] = useState([""]);
+  const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
   const [removed, setRemoved] = useState<string[]>([]); // ids of existing references/examples to drop on save
   const [storeIds, setStoreIds] = useState<string[]>(outfit?.stores.map((s) => s.id) ?? []);
   const [pickStores, setPickStores] = useState(storeIds.length > 0);
@@ -40,7 +44,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
 
   // what's already inspiring this outfit: pasted links + catalogue products
   const inspiration = [
-    ...(saved.data?.references ?? []).map((r) => ({ id: r.id, kind: "reference" as const, image: r.imageUrl, label: new URL(r.sourceUrl).hostname.replace(/^www\./, "") })),
+    ...(saved.data?.references ?? []).map((r) => ({ id: r.id, kind: "reference" as const, image: r.imageUrl, label: r.sourceUrl ? new URL(r.sourceUrl).hostname.replace(/^www\./, "") : "Your photo" })),
     ...(saved.data?.items ?? [])
       .filter((i) => i.kind === "EXAMPLE")
       .map((i) => ({ id: i.productId, kind: "example" as const, image: i.product.imageUrl, label: i.product.title })),
@@ -70,8 +74,11 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
           ),
       );
       const urls = links.map((l) => l.trim()).filter(Boolean);
-      const results = await Promise.allSettled(urls.map((url) => addExample.mutateAsync({ outfitId, url })));
-      const bad = urls.filter((_, i) => results[i].status === "rejected");
+      const results = await Promise.allSettled([
+        ...urls.map((url) => addExample.mutateAsync({ outfitId, url })),
+        ...photos.map(async ({ file }) => uploadExample.mutateAsync({ outfitId, jpeg: await toJpegBase64(file) })),
+      ]);
+      const bad = [...urls, ...photos.map((p) => p.file.name)].filter((_, i) => results[i].status === "rejected");
       if (bad.length) setFailed({ outfitId, urls: bad });
       else await goTo(`/outfits/${outfitId}`);
     } finally {
@@ -84,7 +91,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
       <div className="panel">
         <h2 className="font-heading text-3xl font-semibold">Almost there</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your outfit is saved, but we couldn&apos;t find a photo on {failed.urls.length === 1 ? "this link" : "these links"}:
+          Your outfit is saved, but we couldn&apos;t add {failed.urls.length === 1 ? "this one" : "these"}:
         </p>
         <ul className="mt-3 grid gap-1 text-sm">
           {failed.urls.map((url) => (
@@ -111,7 +118,7 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
 
       <div className="grid gap-2">
         <Label>Inspiration</Label>
-        <p className="-mt-1 text-xs text-muted-foreground">Links to pieces you love: any store, Pinterest or Instagram. A few is plenty.</p>
+        <p className="-mt-1 text-xs text-muted-foreground">Links to pieces you love (any store, Pinterest or Instagram) or your own photos. A few is plenty.</p>
         {existing.map((e) => (
           <div key={e.id} className="flex items-center gap-3 rounded-xl border bg-background/50 p-1.5 pr-1 text-sm">
             <img src={e.image} alt="" className="size-10 shrink-0 rounded-lg object-cover" />
@@ -131,9 +138,23 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
             )}
           </div>
         ))}
-        <Button type="button" variant="ghost" size="sm" className="justify-self-start" onClick={() => setLinks([...links, ""])}>
-          <PlusIcon /> Add another link
-        </Button>
+        {photos.map((p) => (
+          <div key={p.preview} className="flex items-center gap-3 rounded-xl border bg-background/50 p-1.5 pr-1 text-sm">
+            <img src={p.preview} alt="" className="size-10 shrink-0 rounded-lg object-cover" />
+            <span className="min-w-0 flex-1 truncate">{p.file.name}</span>
+            <Button type="button" variant="ghost" size="icon" aria-label="Remove photo" onClick={() => setPhotos(photos.filter((x) => x !== p))}>
+              <XIcon />
+            </Button>
+          </div>
+        ))}
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={() => setLinks([...links, ""])}>
+            <PlusIcon /> Add another link
+          </Button>
+          <PhotoButton size="sm" onPick={(files) => setPhotos([...photos, ...files.map((file) => ({ file, preview: URL.createObjectURL(file) }))])}>
+            Upload photos
+          </PhotoButton>
+        </div>
       </div>
 
       <div className="grid gap-2">

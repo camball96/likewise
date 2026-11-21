@@ -79,3 +79,12 @@ Schema changes: edit `prisma/schema.prisma`, then `npx prisma migrate dev --name
 4. On Render (and in `.env` for local dev), set `MODAL_EMBED_URL` to the URL, and `MODAL_KEY` / `MODAL_SECRET` to the token's ID and secret.
 
 After that, `.github/workflows/modal.yml` redeploys automatically whenever `pipeline/embed.py` or `pipeline/modal_app.py` changes on `production` (or run it by hand from the Actions tab). It needs two repository secrets, `MODAL_TOKEN_ID` and `MODAL_TOKEN_SECRET`: create an API token in Modal → Settings → API Tokens.
+
+## Photo uploads (Cloudflare R2)
+
+Users can upload their own inspiration photos as well as pasting links. The browser shrinks each photo to a JPEG of at most 1024px (`src/lib/photo.ts`), the server stores it in a Cloudflare R2 bucket (`src/server/r2.ts`) and fingerprints it like a pasted link. Removing the reference deletes the photo.
+
+1. Cloudflare dashboard → **R2** → create a bucket (e.g. `likewise-uploads`).
+2. Bucket → **Settings → Public access**: connect a custom domain (e.g. `images.lkws.au`, if the domain's DNS is on Cloudflare) or enable the `r2.dev` URL. That's `R2_PUBLIC_URL` (no trailing slash).
+3. R2 → **Manage API tokens** → create a token with **Object Read & Write** on that bucket. It gives an Access Key ID and Secret Access Key.
+4. Set `R2_ACCOUNT_ID` (shown on the R2 overview page), `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` and `R2_PUBLIC_URL` on Render and in `.env`.

@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { deleteImage, uploadImage } from "./r2";
 import { protectedProcedure, router } from "./trpc";
 
 const PAGE_SIZE = 24;
@@ -88,8 +89,24 @@ export const appRouter = router({
         return reference;
       }),
 
+    // Add a style example from a photo on the user's device. The browser shrinks it to a JPEG first (src/lib/photo.ts).
+    uploadExample: protectedProcedure
+      .input(z.object({ outfitId: z.string(), jpeg: z.base64().max(4_000_000) }))
+      .mutation(async ({ ctx, input }) => {
+        await ownOutfit(ctx, input.outfitId);
+        const bytes = Buffer.from(input.jpeg, "base64");
+        if (bytes[0] !== 0xff || bytes[1] !== 0xd8) throw new TRPCError({ code: "BAD_REQUEST", message: "That file isn't a photo." });
+        const imageUrl = await uploadImage(bytes);
+        const reference = await ctx.db.reference.create({ data: { outfitId: input.outfitId, imageUrl } });
+        void fingerprintReference(ctx, reference.id, imageUrl);
+        return reference;
+      }),
+
     removeReference: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
-      await ctx.db.reference.deleteMany({ where: { id: input.id, outfit: { userId: ctx.user.id } } });
+      const reference = await ctx.db.reference.findFirst({ where: { id: input.id, outfit: { userId: ctx.user.id } } });
+      if (!reference) return;
+      await ctx.db.reference.delete({ where: { id: reference.id } });
+      await deleteImage(reference.imageUrl);
     }),
 
     set: protectedProcedure
