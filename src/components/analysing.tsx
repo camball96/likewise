@@ -9,14 +9,34 @@ const TYPICAL_MS = 60_000;
 
 type Pending = { id: string; imageUrl: string; createdAt: Date | string };
 
-// Shown above the feed while pasted links are still being fingerprinted.
-export function Analysing({ references }: { references: Pending[] }) {
+// Shown above the feed while pasted links are still being fingerprinted, or (with name and no links)
+// while the feed works out what the user's search means for the first time.
+export function Analysing({ references, name }: { references: Pending[]; name?: string }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 10_000);
     return () => clearInterval(timer);
   }, []);
-  if (references.length === 0) return null;
+  if (references.length === 0) {
+    if (!name) return null;
+    return (
+      <div className="panel mb-6 flex items-center gap-5">
+        <div className="grid size-20 shrink-0 place-items-center rounded-full bg-secondary">
+          <Hanger className="h-14" />
+        </div>
+        <div className="min-w-0">
+          <p className="eyebrow">Tailoring your feed</p>
+          <h3 className="mt-1 font-heading text-2xl font-semibold">Getting to know &ldquo;{name}&rdquo;</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            We&apos;re matching what you&apos;re shopping for against today&apos;s pieces. Your feed will sharpen by itself in a few seconds, so keep browsing in the meantime.
+          </p>
+          <p className="mt-2 flex items-center gap-1.5 text-sm font-medium">
+            <Loader2Icon className="size-4 animate-spin" /> Nearly there…
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const oldest = Math.min(...references.map((r) => new Date(r.createdAt).getTime()));
   const minutesLeft = Math.ceil((oldest + TYPICAL_MS - now) / 60_000);

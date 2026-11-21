@@ -24,7 +24,11 @@ export default function OutfitPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const trpc = useTRPC();
-  const outfits = useQuery(trpc.outfits.list.queryOptions());
+  // poll while the search's meaning is being worked out (first visit, rename or category change)
+  const outfits = useQuery({
+    ...trpc.outfits.list.queryOptions(),
+    refetchInterval: (q) => (q.state.data?.find((o) => o.id === id)?.nameWeight === null ? 3000 : false),
+  });
   const outfit = outfits.data?.find((o) => o.id === id);
   const [dialog, setDialog] = useState<"new" | "edit" | null>(null);
   // poll while pasted links are being analysed; the feed restarts when one becomes ready
@@ -90,9 +94,9 @@ export default function OutfitPage() {
               <FeedFilters key={id} value={filters} onChange={setFilters} />
               <p className="hidden shrink-0 pt-1.5 text-xs text-muted-foreground sm:block">Closest matches first</p>
             </div>
-            <Analysing references={references.filter((r) => r.status === "PENDING")} />
+            <Analysing references={references.filter((r) => r.status === "PENDING")} name={outfit.nameWeight === null ? outfit.name : undefined} />
             <Feed
-              key={`${outfit.id}-${ready}-${JSON.stringify(filters)}`}
+              key={`${outfit.id}-${ready}-${outfit.nameWeight === null}-${JSON.stringify(filters)}`}
               outfitId={outfit.id}
               filters={filters}
               onClearFilters={() => setFilters(NO_FILTERS)}

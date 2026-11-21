@@ -181,7 +181,8 @@ function StoreMarquee({ names }: { names: string[] }) {
     <section id="stores" className="scroll-mt-8 border-y border-foreground/10 bg-card/50 py-8">
       <p className="eyebrow text-center">Searching Australia&apos;s favourite stores, every morning</p>
       <div className="mt-5 flex [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-        <div className="flex motion-safe:animate-[marquee_90s_linear_infinite]">
+        {/* a steady ~2.5s per store, so adding stores doesn't speed it up */}
+        <div className="flex motion-safe:animate-[marquee_90s_linear_infinite]" style={{ animationDuration: `${names.length * 2.5}s` }}>
           {row()}
           {row(true)}
         </div>

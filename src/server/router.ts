@@ -71,15 +71,24 @@ export const appRouter = router({
         const stores = input.storeIds.map((id) => ({ id }));
         const data = { name: input.name, categories: input.categories };
         if (!input.id) {
-          return ctx.db.outfit.create({ data: { ...data, userId: ctx.user.id, stores: { connect: stores } } });
+          const outfit = await ctx.db.outfit.create({ data: { ...data, userId: ctx.user.id, stores: { connect: stores } } });
+          void weighName(ctx, outfit); // started now so it's usually done by the time the feed loads
+          return outfit;
         }
         const before = await ownOutfit(ctx, input.id);
         // the name's weight depends on the name and the categories: the feed works it out again
         if (before.name !== input.name || before.categories.join() !== input.categories.join()) {
           await ctx.db.$executeRaw`UPDATE "Outfit" SET "nameEmbedding" = NULL, "nameWeight" = NULL WHERE id = ${input.id}`;
         }
-        return ctx.db.outfit.update({ where: { id: input.id }, data: { ...data, stores: { set: stores } } });
+        const outfit = await ctx.db.outfit.update({ where: { id: input.id }, data: { ...data, stores: { set: stores } } });
+        void weighName(ctx, outfit);
+        return outfit;
       }),
+
+    // Wakes the fingerprint service when the form opens, so it's ready (not asleep) by the time the user saves.
+    warm: protectedProcedure.mutation(() => {
+      if (process.env.MODAL_EMBED_URL) void callFingerprintService({ text: "dress" }).catch(() => {});
+    }),
 
     delete: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
       await ownOutfit(ctx, input.id);
@@ -246,7 +255,7 @@ export const appRouter = router({
     .query(async ({ ctx, input }) => {
       const outfit = await ownOutfit(ctx, input.outfitId);
       const storeIds = outfit.stores.map((s) => s.id);
-      await weighName(ctx, outfit);
+      void weighName(ctx, outfit); // not awaited: the page polls and reloads the feed once the name has a weight
       return ctx.db.$queryRaw<FeedProduct[]>`
         WITH pos AS (
           SELECT p.embedding FROM "OutfitItem" i JOIN "Product" p ON p.id = i."productId"
@@ -379,12 +388,16 @@ async function fingerprintReference(ctx: Ctx, id: string, imageUrl: string) {
 // How much the outfit name ("Floral tops") counts in the feed, from 0 to 1 of one inspiration piece.
 // It's judged by how closely its 12 best matches in the chosen categories fit it: words that don't describe
 // clothing ("test", "Sarah") match nothing well and drop to 0, leaving results to the inspiration, hearts and
-// category pills. Worked out once, then again after a rename or category change. Without Modal it stays out.
+// category pills. Worked out once, then again after a rename or category change. If the Modal service is
+// missing or fails, the weight is 0 (the name is left out) until the next rename or category change.
 const NAME_FIT = { none: 0.035, full: 0.07 }; // average similarity of those 12; tested on real names vs nonsense
+const weighing = new Set<string>(); // outfits being weighed right now, so feed pages don't start a second one
 
 async function weighName(ctx: Ctx, outfit: { id: string; name: string; categories: string[] }) {
+  if (weighing.has(outfit.id)) return;
   const [row] = await ctx.db.$queryRaw<{ weighed: boolean }[]>`SELECT "nameWeight" IS NOT NULL AS weighed FROM "Outfit" WHERE id = ${outfit.id}`;
-  if (row?.weighed || !process.env.MODAL_EMBED_URL) return;
+  if (row?.weighed) return;
+  weighing.add(outfit.id);
   try {
     const { embedding } = await callFingerprintService({ text: outfit.name }, 20_000);
     const vec = `[${embedding.join(",")}]`;
@@ -400,7 +413,10 @@ async function weighName(ctx: Ctx, outfit: { id: string; name: string; categorie
     const scaled = weight > 0 ? `[${embedding.map((x) => x * weight).join(",")}]` : null;
     await ctx.db.$executeRaw`UPDATE "Outfit" SET "nameEmbedding" = ${scaled}::vector, "nameWeight" = ${weight} WHERE id = ${outfit.id}`;
   } catch (e) {
-    console.error(e); // tried again on the next feed load
+    if (process.env.MODAL_EMBED_URL) console.error(e);
+    await ctx.db.$executeRaw`UPDATE "Outfit" SET "nameEmbedding" = NULL, "nameWeight" = 0 WHERE id = ${outfit.id}`;
+  } finally {
+    weighing.delete(outfit.id);
   }
 }
 

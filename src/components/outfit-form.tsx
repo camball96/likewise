@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRightIcon, PlusIcon, XIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,8 @@ export function OutfitForm({ outfit, title, onCancel }: { outfit?: Outfit; title
   const uploadExample = useMutation(trpc.items.uploadExample.mutationOptions());
   const removeReference = useMutation(trpc.items.removeReference.mutationOptions());
   const setItem = useMutation(trpc.items.set.mutationOptions());
+  const { mutate: warm } = useMutation(trpc.outfits.warm.mutationOptions());
+  useEffect(() => warm(), [warm]); // wake the fingerprint service while the form is filled in
 
   const [name, setName] = useState(outfit?.name ?? "");
   const [categories, setCategories] = useState<string[]>(outfit?.categories ?? []);
