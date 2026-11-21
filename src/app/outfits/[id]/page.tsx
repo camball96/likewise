@@ -56,7 +56,7 @@ export default function OutfitPage() {
               {o.name}
             </Link>
           ))}
-          <Button variant="ghost" size="icon" aria-label="New outfit" onClick={() => setDialog("new")}>
+          <Button variant="ghost" size="icon" aria-label="New results" onClick={() => setDialog("new")}>
             <PlusIcon />
           </Button>
         </nav>
@@ -67,11 +67,11 @@ export default function OutfitPage() {
 
       {outfit && (
         <Tabs defaultValue="feed" className="mt-8">
-          <p className="eyebrow">Curated outfit</p>
+          <p className="eyebrow">Curated results</p>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <h1 className="flex items-center gap-1 font-heading text-4xl font-semibold sm:text-5xl">
               {outfit.name}
-              <Button variant="ghost" size="icon" aria-label="Edit outfit" onClick={() => setDialog("edit")}>
+              <Button variant="ghost" size="icon" aria-label="Edit results" onClick={() => setDialog("edit")}>
                 <PencilIcon />
               </Button>
             </h1>
@@ -106,7 +106,7 @@ export default function OutfitPage() {
           </TabsContent>
         </Tabs>
       )}
-      {outfits.data && !outfit && <p className="mt-10 text-center text-muted-foreground">Outfit not found.</p>}
+      {outfits.data && !outfit && <p className="mt-10 text-center text-muted-foreground">Results not found.</p>}
 
       <Dialog open={dialog !== null} onOpenChange={(open) => !open && setDialog(null)}>
         <DialogContent showCloseButton={false} className="max-h-[90vh] overflow-y-auto bg-transparent p-0 ring-0 sm:max-w-md">
@@ -114,7 +114,7 @@ export default function OutfitPage() {
             <OutfitForm
               key={dialog + id}
               outfit={dialog === "edit" ? outfit : undefined}
-              title={dialog === "edit" ? "Edit outfit" : "New outfit"}
+              title={dialog === "edit" ? "Edit results" : "New results"}
               onCancel={() => setDialog(null)}
             />
           )}
@@ -242,10 +242,10 @@ function Feed({
             {storeCount === 0 ? "our stores" : storeCount === 1 ? "the store you picked" : `the ${storeCount} stores you picked`} right now
           </p>
           <p className="mt-3 text-sm text-muted-foreground">
-            Every morning we go through the new arrivals for you. In the meantime, try fine-tuning this outfit&apos;s inspiration links or categories.
+            Every morning we go through the new arrivals for you. In the meantime, try fine-tuning your inspiration links or categories.
           </p>
           <Button className="mt-6" onClick={onEdit}>
-            <PencilIcon /> Edit outfit
+            <PencilIcon /> Edit results
           </Button>
         </div>
       )}

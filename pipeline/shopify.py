@@ -117,11 +117,11 @@ def product_list_path(page_size: int, page: int) -> str:
 # ---------------------------------------------------------------- classification
 
 EXCLUDE = re.compile(
-    r"\b(accessor(?:y|ies)|axx|intimates?|gift ?cards?|e-?gift|bags?|tote|clutch|purse|wallet|belts?|earrings?|earings?|necklaces?|bracelets?|rings?|"
+    r"\b(accessor(?:y|ies)|axx|gift ?cards?|e-?gift|bags?|tote|clutch|purse|wallet|belts?|earrings?|earings?|necklaces?|bracelets?|rings?|"
     r"jewel(?:le)?ry|anklet|hair|scrunchie|claw clip|headband|hats?|caps?|beanie|scarf|sunglasses|socks?|"
     r"shoes?|heels?|boots?|sandals?|flats|sneakers?|slides|mules|loafers|thongs|footwear|"
     r"beauty|fragrance|perfume|candle|homewares?|towel|mug|book|sticker|keyring|phone case|"
-    r"(?<!sports )(?<!sport )bras?|bralettes?|briefs?|undies|underwear|knickers|thong brief|g-string|lingerie|"
+    r"toys?|vibrators?|massagers?|lube|lubricant|nipple covers?|pasties|handcuffs?|restraints?|blindfolds?|"
     r"maternity|kids?|girls|baby|"
     r"shipping protection|route|insurance|sample|gift wrap|gift box|warranty|donation)\b",
     re.I,
@@ -133,6 +133,7 @@ MENS = re.compile(r"(^|[^a-z])(mens|men's|men|male|him)([^a-z]|$)", re.I)
 CATEGORY_RULES: list[tuple[str, re.Pattern]] = [
     ("Dresses",     re.compile(r"\b(dress(es)?|gown|slip dress|maxi dress|midi dress|mini dress)\b", re.I)),
     ("Activewear",  re.compile(r"\b(activewear|active|sports? bras?|leggings?|tights|bike shorts?|biker shorts?|yoga|gym|pilates|workout|training|running|tennis)\b", re.I)),
+    ("Lingerie",    re.compile(r"\b(bras?|bralettes?|briefs?|knickers?|undies|underwear|lingerie|intimates?|g-?strings?|thong|suspenders?|garters?)\b", re.I)),
     ("Sleepwear",   re.compile(r"\b(pj|pjs|pyjamas?|pajamas?|sleep\w*|lounge\w*|robe|nightie|nightdress)s?\b", re.I)),
     ("Jumpsuits",   re.compile(r"\b(jumpsuit|playsuit|romper|unitard)s?\b", re.I)),
     ("Sets",        re.compile(r"\b(set|co-?ord|two piece|2 piece|matching)s?\b", re.I)),
@@ -145,6 +146,8 @@ CATEGORY_RULES: list[tuple[str, re.Pattern]] = [
     ("Tops",        re.compile(r"\b(tops?|tee|t-shirt|tshirt|shirt|blouse|cami|camisole|bodysuit|corset|bustier|tank|singlet|crop|tube|halter|polo|bodice|vest top|long ?sleeve)s?\b", re.I)),
 ]
 CATEGORIES = [c for c, _ in CATEGORY_RULES]
+# swim stores call bikini bottoms "briefs" and tops "bralettes": those stay Swim, not Lingerie
+SWIM_PIECE = re.compile(r"\b(swim\w*|bikini (tops?|pants?|bottoms?)|kini)\b", re.I)
 
 
 def classify(title: str, product_type: str, tags: list[str]) -> str | None:
@@ -153,6 +156,8 @@ def classify(title: str, product_type: str, tags: list[str]) -> str | None:
         if not text:
             continue
         for cat, rx in CATEGORY_RULES:
+            if cat == "Lingerie" and (SWIM_PIECE.search(title or "") or SWIM_PIECE.search(product_type or "")):
+                continue
             if rx.search(text):
                 return cat
     return None

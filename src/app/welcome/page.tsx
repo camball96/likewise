@@ -38,11 +38,11 @@ export default function Home() {
         <section className="mx-auto max-w-md">
           <p className="eyebrow">Welcome{firstName ? `, ${firstName}` : ""}</p>
           <h1 className="mt-3 font-heading text-5xl leading-[1.05] font-semibold sm:text-6xl">
-            Start your first <em className="text-[#6e4a35]">outfit</em>
+            See your first <em className="text-[#6e4a35]">results</em>
           </h1>
           <p className="mt-4 text-muted-foreground">
-            An outfit is a look you&apos;re shopping for, like &ldquo;Formal dresses&rdquo; or &ldquo;PJs&rdquo;. Show us a few pieces you love and we&apos;ll
-            build an edit of pieces chosen just for you.
+            Tell us what you&apos;re shopping for, like &ldquo;Formal dresses&rdquo; or &ldquo;PJs&rdquo;. Show us a few pieces you love and we&apos;ll
+            build results chosen just for you.
           </p>
           <Steps className="mt-6" />
           <Button
@@ -54,7 +54,7 @@ export default function Home() {
             }}
             className={`mt-8 transition-opacity duration-300 ${open ? "pointer-events-none opacity-0 max-md:hidden" : ""}`}
           >
-            Create an outfit <ArrowRightIcon />
+            Get started <ArrowRightIcon />
           </Button>
         </section>
 

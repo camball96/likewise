@@ -46,7 +46,7 @@ export default async function LandingPage() {
        ORDER BY p.embedding <=> seed.embedding LIMIT 40)`,
     db.store.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { name: true } }),
   ]);
-  // the seed first, then the closest match from each other store (hero shows 3, the Lists mock the next 4)
+  // the seed first, then the closest match from each other store (hero shows 3, the Collections mock the next 4)
   const seen = new Set<string>();
   nearest.sort((a, b) => Number(b.isSeed) - Number(a.isSeed)); // stable: matches stay closest-first
   const picks = nearest.filter((p) => !seen.has(p.storeId) && seen.add(p.storeId)).slice(0, 8);
@@ -57,7 +57,7 @@ export default async function LandingPage() {
       <Hero picks={picks} />
       <StoreMarquee names={stores.map((s) => s.name)} />
       <HowItWorks />
-      <Lists picks={picks.slice(4)} />
+      <Collections picks={picks.slice(4)} />
       <FinalCta />
     </main>
   );
@@ -76,8 +76,8 @@ function Nav() {
         <a href="#stores" className="hover:text-foreground">
           Stores
         </a>
-        <a href="#lists" className="hover:text-foreground">
-          Lists
+        <a href="#collections" className="hover:text-foreground">
+          Collections
         </a>
       </nav>
       <div className="ml-auto flex items-center gap-2">
@@ -226,10 +226,10 @@ function HowItWorks() {
   );
 }
 
-function Lists({ picks }: { picks: Pick[] }) {
+function Collections({ picks }: { picks: Pick[] }) {
   return (
-    <section id="lists" className="mx-auto grid max-w-6xl scroll-mt-8 items-center gap-12 px-5 py-16 md:grid-cols-2">
-      {/* a mock list with its share message */}
+    <section id="collections" className="mx-auto grid max-w-6xl scroll-mt-8 items-center gap-12 px-5 py-16 md:grid-cols-2">
+      {/* a mock collection with its share message */}
       <div className="relative order-2 mx-auto w-full max-w-md md:order-1">
         <div className="panel -rotate-1">
           <div className="flex items-center justify-between">
@@ -265,22 +265,22 @@ function Lists({ picks }: { picks: Pick[] }) {
       </div>
 
       <div className="order-1 md:order-2">
-        <p className="eyebrow">Lists for every occasion</p>
+        <p className="eyebrow">Collections for every occasion</p>
         <h2 className="mt-3 font-heading text-5xl leading-[1.05] font-semibold">
           Save it for <em className="text-[#6e4a35]">Sarah&apos;s wedding</em>
         </h2>
         <p className="mt-4 text-muted-foreground">
-          Bookmark pieces from any of your looks into a list for an event or trip, then share the whole list in one tap. Every piece links straight to the store.
+          Bookmark pieces from any of your looks into a collection for an event or trip, then share the whole collection in one tap. Every piece links straight to the store.
         </p>
         <ul className="mt-6 grid gap-3 text-sm">
-          {["Lists hold pieces from any look", "One tap copies every link, ready for a group chat", "Hearting a piece also sharpens your picks"].map((t) => (
+          {["Collections hold pieces from any look", "One tap copies every link, ready for a group chat", "Hearting a piece also sharpens your picks"].map((t) => (
             <li key={t} className="flex items-center gap-3">
               <Sparkle className="size-3.5 shrink-0" /> {t}
             </li>
           ))}
         </ul>
         <Link href={SIGN_UP} className={cn(cta, "mt-8")}>
-          Start a list <ArrowRightIcon />
+          Start a collection <ArrowRightIcon />
         </Link>
       </div>
     </section>

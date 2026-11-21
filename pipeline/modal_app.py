@@ -1,4 +1,5 @@
 """Fingerprint service on Modal: the app sends a photo URL, gets its fingerprint back in about a second.
+It also fingerprints short text ("floral tops"), which shares the same space as the photos.
 
 Deploy (from the repo root):  modal deploy pipeline/modal_app.py
 The endpoint needs a Modal proxy auth token (Modal dashboard → Settings → Proxy Auth Tokens), sent as the
@@ -63,6 +64,8 @@ class Fingerprint:
 
         from embed import load_image
 
+        if "text" in body:  # what the user is shopping for, e.g. "Floral tops"
+            return {"embedding": self.embedder.text([str(body["text"])[:100]])[0].tolist()}
         try:
             photo = load_image(body["url"])
         except Exception as e:
